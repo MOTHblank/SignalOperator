@@ -26,7 +26,7 @@ object CipherEngine {
     }
 
     fun vigenereEncrypt(input: String, keyword: String): String {
-        var result = ""
+        val result = StringBuilder(input.length)
         var keywordIndex = 0
         val upperKeyword = keyword.uppercase()
 
@@ -36,20 +36,20 @@ object CipherEngine {
                     val shift = upperKeyword[keywordIndex % keyword.length] - 'A'
                     var shifted = char + shift
                     if (shifted > 'Z') shifted -= 26
-                    result += shifted
+                    result.append(shifted)
                     keywordIndex++
                 }
                 char.isLowerCase() -> {
                     val shift = upperKeyword[keywordIndex % keyword.length] - 'A'
                     var shifted = char + shift
                     if (shifted > 'z') shifted -= 26
-                    result += shifted
+                    result.append(shifted)
                     keywordIndex++
                 }
-                else -> result += char
+                else -> result.append(char)
             }
         }
-        return result
+        return result.toString()
     }
 
     fun railFenceEncrypt(input: String): String {
