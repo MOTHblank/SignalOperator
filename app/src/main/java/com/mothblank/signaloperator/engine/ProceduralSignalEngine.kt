@@ -11,6 +11,14 @@ data class SystemData(
     val currentTime: String
 )
 
+data class SignalRequest(
+    val phase: GamePhase,
+    val frequency: Float,
+    val seed: Long,
+    val systemData: SystemData? = null,
+    val solvedPuzzlesCount: Int = 0
+)
+
 class ProceduralSignalEngine {
 
     private val testSenders = listOf("EXAM-NODE-1", "PROCTOR-AUTO", "SIMULATION-A")
@@ -44,7 +52,13 @@ class ProceduralSignalEngine {
 
     private val deadDropSenders = listOf("SYSTEM-KERNEL", "HARDWARE-MONITOR", "INTEL-RECOVERY")
     
-    fun generateSignal(phase: GamePhase, frequency: Float, seed: Long, systemData: SystemData? = null, solvedPuzzlesCount: Int = 0): SignalData {
+    fun generateSignal(request: SignalRequest): SignalData {
+        val phase = request.phase
+        val frequency = request.frequency
+        val seed = request.seed
+        val systemData = request.systemData
+        val solvedPuzzlesCount = request.solvedPuzzlesCount
+
         // Create a deterministic seed for this specific frequency + game seed
         val frequencySeed = (seed + (frequency * 10).toInt()).toLong()
         val random = Random(frequencySeed)

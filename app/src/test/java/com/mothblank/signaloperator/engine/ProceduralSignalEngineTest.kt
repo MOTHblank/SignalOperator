@@ -15,7 +15,7 @@ class ProceduralSignalEngineTest {
         // and that a valid solution is always provided.
         for (phase in GamePhase.values()) {
             for (i in 0..50) {
-                val signal = engine.generateSignal(phase, 100.0f, i.toLong())
+                val signal = engine.generateSignal(SignalRequest(phase, 100.0f, i.toLong()))
                 
                 assertNotNull(signal.id)
                 assertNotNull(signal.solution)
