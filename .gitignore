@@ -1,0 +1,45 @@
+# Built artifacts
+*.apk
+*.aar
+*.jar
+*.bin
+
+# Gradle files
+.gradle/
+build/
+app/build/
+
+# IDE files
+.idea/
+*.iml
+.DS_Store
+
+# Local configuration
+local.properties
+
+# Kotlin / IntelliJ files
+.kotlin/
+*.ipr
+*.iws
+out/
+
+# Trash and temporary directories
+trash/
+temp/
+tmp/
+
+# Logs and diagnostics
+logs/
+*.log
+
+# Agent Context & Memories (Low Noise & Security)
+GEMINI.md
+MEMORY.md
+memory/
+
+# Design documents
+docs/
+
+# Local OS files
+Thumbs.db
+db.lck
