@@ -17,6 +17,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.focusable
 import com.mothblank.signaloperator.MainViewModel
 import com.mothblank.signaloperator.models.GameState
 import com.mothblank.signaloperator.models.MenuSubScreen
@@ -445,17 +450,27 @@ fun TerminalMenuItem(
     onClick: () -> Unit,
     color: Color
 ) {
-    var isHovered by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val isActive = isHovered || isFocused || isPressed
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .focusable()
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = if (isHovered) "> " else "  ",
+            text = if (isActive) "> " else "  ",
             color = color,
             fontFamily = FontFamily.Monospace,
             fontSize = 14.sp,
@@ -463,19 +478,14 @@ fun TerminalMenuItem(
         )
         Text(
             text = label,
-            color = if (isHovered) Color.Black else color,
+            color = if (isActive) Color.Black else color,
             fontFamily = FontFamily.Monospace,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
-                .background(if (isHovered) color else Color.Transparent)
+                .background(if (isActive) color else Color.Transparent)
                 .padding(horizontal = 4.dp)
         )
-    }
-
-    // Capture simple tap focus
-    DisposableEffect(Unit) {
-        onDispose { isHovered = false }
     }
 }
 
