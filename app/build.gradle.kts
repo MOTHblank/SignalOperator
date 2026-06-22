@@ -55,8 +55,7 @@ dependencies {
     // ViewModel utilities for Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     
-    // Audio & TTS
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.17.1")
+
 
     testImplementation("junit:junit:4.13.2")
 
