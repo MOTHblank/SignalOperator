@@ -10,6 +10,7 @@ import com.mothblank.signaloperator.audio.AndroidTextToSpeech
 import com.mothblank.signaloperator.audio.SoundManager
 import com.mothblank.signaloperator.audio.TextToSpeechEngine
 import com.mothblank.signaloperator.engine.ProceduralSignalEngine
+import com.mothblank.signaloperator.engine.SignalRequest
 import com.mothblank.signaloperator.models.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -587,7 +588,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 
                 viewModelScope.launch {
                     delay(500) 
-                    val signal = engine.generateSignal(_gameState.value.phase, activeHotspot, _gameState.value.seed, getSystemData(), _gameState.value.puzzlesSolved)
+                    val signal = engine.generateSignal(
+                        SignalRequest(
+                            _gameState.value.phase,
+                            activeHotspot,
+                            _gameState.value.seed,
+                            getSystemData(),
+                            _gameState.value.puzzlesSolved
+                        )
+                    )
                     activeSignalFrequency = activeHotspot
                     _activeSignal.value = signal
                     addLog("LOCK ACQUIRED.", LogType.INTERCEPT)
