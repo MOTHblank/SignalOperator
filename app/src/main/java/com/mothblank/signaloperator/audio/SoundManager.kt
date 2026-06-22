@@ -181,6 +181,7 @@ class SoundManager(private val context: Context) {
             var dronePhase1 = 0.0
             var dronePhase2 = 0.0
             var lfoPhase = 0.0
+            val random = kotlin.random.Random.Default
 
             while (isStaticRunning) {
                 // Dynamic parameters derived from stability
@@ -193,7 +194,7 @@ class SoundManager(private val context: Context) {
                 
                 for (i in buffer.indices) {
                     // White noise
-                    val white = (Math.random() * 2.0 - 1.0)
+                    val white = (random.nextDouble() * 2.0 - 1.0)
                     
                     // Brown noise (integral of white noise) - gives that heavy low-end roar
                     val brown = (lastSample + (0.02 * white)) / 1.02
@@ -313,6 +314,7 @@ class SoundManager(private val context: Context) {
         var whistlePhase = 0.0
         var rmPhase = 0.0
         val sampleDt = 1.0 / sampleRate
+        val random = kotlin.random.Random.Default
 
         for (i in samples.indices) {
             // 1. Bit crush
@@ -343,7 +345,7 @@ class SoundManager(private val context: Context) {
             
             // 6. Add noise
             val totalNoise = noiseLevel * 0.6f + baselineNoise
-            val noise = (Math.random() * 2.0 - 1.0).toFloat() * totalNoise
+            val noise = (random.nextDouble() * 2.0 - 1.0).toFloat() * totalNoise
             
             // 7. Combine & Gate
             processedSamples[i] = ((sample * 2.2f + whistle) * voiceVolume + noise).coerceIn(-1.0f, 1.0f)
