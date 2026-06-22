@@ -297,9 +297,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-        window.decorView.post {
-            hideSystemUI()
-        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -310,8 +307,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun hideSystemUI() {
+        val decorView = window.peekDecorView() ?: return
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowInsetsControllerCompat(window, window.decorView).let { controller ->
+        WindowInsetsControllerCompat(window, decorView).let { controller ->
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
