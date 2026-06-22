@@ -119,3 +119,8 @@ data class RouterGameState(
     val exitY: Int = 1,
     val timeLeftSeconds: Int = 15
 )
+
+data class DialogueLine(
+    val speaker: String,
+    val text: String
+)

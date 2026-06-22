@@ -64,6 +64,8 @@ class MainActivity : ComponentActivity() {
             val gain          by viewModel.gain.collectAsState()
             val filter        by viewModel.filter.collectAsState()
             val isMapViewActive by viewModel.isMapViewActive.collectAsState()
+            val activeDialogue by viewModel.activeDialogue.collectAsState()
+            val currentDialogueIndex by viewModel.currentDialogueIndex.collectAsState()
 
             var activeHint by remember { mutableStateOf<Pair<String, String>?>(null) }
 
@@ -83,6 +85,8 @@ class MainActivity : ComponentActivity() {
                     if (isEnding) {
                         viewModel.playClick()
                         viewModel.returnToMenu()
+                    } else if (activeDialogue != null) {
+                        viewModel.advanceDialogue()
                     } else if (activeHint != null) {
                         activeHint = null
                     } else if (gameState.selectedLogEntry != null) {
@@ -135,6 +139,16 @@ class MainActivity : ComponentActivity() {
                             currentColor = currentColor
                         )
                     } else {
+                        activeDialogue?.let { dialogueLines ->
+                            DialogueOverlay(
+                                dialogue = dialogueLines,
+                                currentIndex = currentDialogueIndex,
+                                color = currentColor,
+                                onPlayClick = { viewModel.playClick() },
+                                onNext = { viewModel.advanceDialogue() }
+                            )
+                        }
+
                         activeHint?.let { (title, description) ->
                             HelpOverlay(
                                 title = title,

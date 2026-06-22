@@ -100,6 +100,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _isMapViewActive = MutableStateFlow(false)
     val isMapViewActive: StateFlow<Boolean> = _isMapViewActive.asStateFlow()
 
+    private val _activeDialogue = MutableStateFlow<List<DialogueLine>?>(null)
+    val activeDialogue: StateFlow<List<DialogueLine>?> = _activeDialogue.asStateFlow()
+
+    private val _currentDialogueIndex = MutableStateFlow(0)
+    val currentDialogueIndex: StateFlow<Int> = _currentDialogueIndex.asStateFlow()
+
     private val hotspots = mutableListOf<Float>()
     private var isScanning = false
     private var lockedHotspot: Float? = null
@@ -317,6 +323,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _logs.value = emptyList()
         addLog("SYSTEM INITIALIZED. SCANNER STANDBY.", LogType.SYSTEM)
         saveGame()
+        
+        triggerDialogue(getIntroDialogue())
     }
 
     fun returnToMenu() {
@@ -762,6 +770,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     solvedHotspots.clear()
                     generateHotspots()
                     addLog("LOCAL BUFFER PURGED. OVERRIDE DETECTED FROM EXTERNAL NODE.", LogType.ERROR)
+                    triggerDialogue(getLiveIntrusionDialogue())
                 }
                 GamePhase.LIVE_INTRUSION -> {
                     nextPhase = GamePhase.ACTIVE_INVESTIGATION
@@ -771,6 +780,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     corruption = 1f
                     generateHotspots()
                     addLog("SIGNAL INDUCED COGNITIVE DISTORTION DETECTED. NEURAL LINK COMPROMISED.", LogType.ERROR)
+                    triggerDialogue(getActiveInvestigationDialogue())
                 }
                 GamePhase.ACTIVE_INVESTIGATION -> {
                     nextPhase = GamePhase.THE_INTERVIEW
@@ -780,6 +790,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     corruption = 2f
                     generateHotspots()
                     addLog("CRITICAL: DIRECT COGNITIVE ASSESSMENT INITIALIZED. RESPOND.", LogType.ERROR)
+                    triggerDialogue(getTheInterviewDialogue())
                 }
                 GamePhase.THE_INTERVIEW -> {
                     nextPhase = when (solutionInput.uppercase().trim()) {
@@ -1036,6 +1047,68 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         
         return dfs(0, game.entryY, 3)
+    }
+
+    fun triggerDialogue(lines: List<DialogueLine>) {
+        _activeDialogue.value = lines
+        _currentDialogueIndex.value = 0
+        // Suppress continuous static hum volume if dialogue is active
+        if (_gameState.value.isSoundEnabled) {
+            soundManager.updateStaticParameters(volume = 0.05f, pitch = 1.0f, stability = 0f)
+        }
+    }
+
+    fun advanceDialogue() {
+        playClick()
+        val currentLines = _activeDialogue.value ?: return
+        val nextIndex = _currentDialogueIndex.value + 1
+        if (nextIndex < currentLines.size) {
+            _currentDialogueIndex.value = nextIndex
+        } else {
+            _activeDialogue.value = null
+            _currentDialogueIndex.value = 0
+            // Restore normal static sound values
+            if (_gameState.value.isSoundEnabled) {
+                updateAudioParameters()
+            }
+        }
+    }
+
+    fun getIntroDialogue(): List<DialogueLine> {
+        return listOf(
+            DialogueLine("SYSTEM", "COLD BOOT SUCCESSFUL. INITIATING COGNITIVE SYNC LOG v814."),
+            DialogueLine("SYSTEM", "WELCOME, OPERATOR 814. THIS TERMINAL IS ASSIGNED FOR YOUR SKILL ASSESSMENT."),
+            DialogueLine("SYSTEM", "DIAL THE FREQUENCY SLIDER TO RECOVER DATA STREAM CORRELATIONS."),
+            DialogueLine("ECHO-ACTUAL", "...static... Hello? Can any operator read this? This is Echo-Actual on the ground."),
+            DialogueLine("ECHO-ACTUAL", "We're at Site Alpha. Connections are fragmenting. If anyone is at the terminal, we need you to lock onto our coordinates and stabilize the downlink."),
+            DialogueLine("ECHO-ACTUAL", "Wait... what is that hum in the background? Just... please, find our frequencies.")
+        )
+    }
+
+    fun getLiveIntrusionDialogue(): List<DialogueLine> {
+        return listOf(
+            DialogueLine("SYSTEM", "CRITICAL INTRUSION. DATA CHANNELS INJECTING UNREGISTERED PHONEME NOISE."),
+            DialogueLine("ECHO-ACTUAL", "Operator! Do you copy? The terrain in Site Alpha... it's shifting. The compass is spinning."),
+            DialogueLine("ECHO-ACTUAL", "Echo-2 went to check Sector 4 Relay but his transceiver went dark. I can hear... voices in the static. Please, scan the dial. Locate Echo-2's beacon!")
+        )
+    }
+
+    fun getActiveInvestigationDialogue(): List<DialogueLine> {
+        return listOf(
+            DialogueLine("SYSTEM", "NEURAL SYNC EXCEEDS 60%. COGNITIVE CALIBRATION REQUIRED."),
+            DialogueLine("ECHO-2", "...static... The frequency... it isn't noise. It's... beautiful. The corridors are aligned now."),
+            DialogueLine("ECHO-2", "We don't need the relays anymore. There are no gates. They are inviting us in."),
+            DialogueLine("ECHO-ACTUAL", "Don't listen to him, Operator! He's compromised! The Exclusion Zone is overflowing. Keep the filter active! Track the remaining coordinates! Do NOT let the static bleed in!")
+        )
+    }
+
+    fun getTheInterviewDialogue(): List<DialogueLine> {
+        return listOf(
+            DialogueLine("THE ASSESSOR", "OPERATOR 814. YOUR ASSESSMENT REACHES TERMINAL COHERENCE."),
+            DialogueLine("THE ASSESSOR", "YOU HAVE SEEN THE RE-ARRANGED CHANNELS. YOU HAVE GUIDED THEIR CONSCIOUSNESS TO THE RECEPTACLES."),
+            DialogueLine("THE ASSESSOR", "NOW, THE ASSESSMENT DEMANDS YOUR EXPLICIT ALIGNMENT."),
+            DialogueLine("THE ASSESSOR", "SUBMIT YOUR ANSWER IN THE DECODER INTERFACE: [I ACCEPT] OR [I REFUSE] TO CHOOSE YOUR TRANSITION.")
+        )
     }
 
     override fun onCleared() {
