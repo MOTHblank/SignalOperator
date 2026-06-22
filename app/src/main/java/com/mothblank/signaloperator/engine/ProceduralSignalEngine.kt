@@ -364,7 +364,7 @@ class ProceduralSignalEngine {
                         0 -> {
                             cipherType = "VIGENERE"
                             encodedMessage = CipherEngine.vigenereEncrypt(rawMessage, keyword)
-                            objective = "DECRYPT VIGENERE STREAM"
+                            objective = "DECRYPT VIGENERE (KEY: $keyword)"
                             metadata = "ENC: VIGENERE | KEY: $keyword"
                         }
                         1 -> {

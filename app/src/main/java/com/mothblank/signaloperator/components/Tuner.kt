@@ -18,6 +18,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import java.util.Locale
 
 @Composable
@@ -26,7 +30,8 @@ fun FrequencyTuner(
     setFrequency: (Float) -> Unit,
     proximity: Float,
     color: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onShowHint: (() -> Unit)? = null
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -34,11 +39,27 @@ fun FrequencyTuner(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                "FREQUENCY: ${String.format(Locale.US, "%.2f", frequency)} MHz", 
-                color = color, 
-                style = MaterialTheme.typography.labelLarge
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "FREQUENCY: ${String.format(Locale.US, "%.2f", frequency)} MHz", 
+                    color = color, 
+                    style = MaterialTheme.typography.labelLarge
+                )
+                if (onShowHint != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = onShowHint,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Tuning Information",
+                            tint = color.copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
             
             // Tuning LED indicator
             Row(verticalAlignment = Alignment.CenterVertically) {

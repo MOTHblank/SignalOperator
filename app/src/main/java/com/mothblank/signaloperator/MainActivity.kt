@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
             val filter        by viewModel.filter.collectAsState()
             val isMapViewActive by viewModel.isMapViewActive.collectAsState()
 
-            var showHelp by remember { mutableStateOf(false) }
+            var activeHint by remember { mutableStateOf<Pair<String, String>?>(null) }
 
             // Intercept system back swipes and gestures
             BackHandler(enabled = true) {
@@ -83,8 +83,8 @@ class MainActivity : ComponentActivity() {
                     if (isEnding) {
                         viewModel.playClick()
                         viewModel.returnToMenu()
-                    } else if (showHelp) {
-                        showHelp = false
+                    } else if (activeHint != null) {
+                        activeHint = null
                     } else if (gameState.selectedLogEntry != null) {
                         viewModel.selectLogEntry(null)
                     } else if (isMapViewActive) {
@@ -135,8 +135,13 @@ class MainActivity : ComponentActivity() {
                             currentColor = currentColor
                         )
                     } else {
-                        if (showHelp) {
-                            HelpOverlay(onDismiss = { showHelp = false }, color = currentColor)
+                        activeHint?.let { (title, description) ->
+                            HelpOverlay(
+                                title = title,
+                                description = description,
+                                color = currentColor,
+                                onDismiss = { activeHint = null }
+                            )
                         }
 
                         gameState.activeRouterGame?.let { routerGame ->
@@ -216,9 +221,6 @@ class MainActivity : ComponentActivity() {
                                 IconButton(onClick = { viewModel.toggleMapView() }) {
                                     Icon(Icons.Default.Place, "Map", tint = if (isMapViewActive) Color.White else currentColor)
                                 }
-                                IconButton(onClick = { showHelp = true }) {
-                                    Icon(Icons.Default.Info, "Help", tint = currentColor)
-                                }
                             }
                         }
 
@@ -239,7 +241,13 @@ class MainActivity : ComponentActivity() {
                             frequency    = frequency,
                             setFrequency = { viewModel.setFrequency(it) },
                             proximity    = proximity,
-                            color        = currentColor
+                            color        = currentColor,
+                            onShowHint   = {
+                                activeHint = Pair(
+                                    "SYSTEM CALIBRATION",
+                                    "Adjust the FREQUENCY dial using the slider until you hear static clear up and see a waveform in the visualizer.\n\nOnce locked, use the GAIN and FILTER sliders to adjust your wave. Achieve 95% stability to clear up corruption and decompress packet contents."
+                                )
+                            }
                         )
 
                         // SECTION 3: MAIN OPERATIONAL AREA
@@ -278,7 +286,8 @@ class MainActivity : ComponentActivity() {
                                         proximity        = proximity,
                                         downloadProgress = gameState.downloadProgress,
                                         color            = currentColor,
-                                        onAction         = { action, input -> viewModel.handleAction(action, input) }
+                                        onAction         = { action, input -> viewModel.handleAction(action, input) },
+                                        onShowHint       = { title, desc -> activeHint = Pair(title, desc) }
                                     )
                                 }
                             }
