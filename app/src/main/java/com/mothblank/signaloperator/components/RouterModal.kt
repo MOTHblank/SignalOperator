@@ -71,6 +71,8 @@ fun RouterModal(
             }
 
             // Grid rendering
+            val tileMap = game.grid.associateBy { it.x to it.y }
+
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
@@ -82,7 +84,7 @@ fun RouterModal(
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         for (x in 0 until game.size) {
-                            val tile = game.grid.find { it.x == x && it.y == y }
+                            val tile = tileMap[x to y]
                             if (tile != null) {
                                 Box(
                                     contentAlignment = Alignment.Center,
