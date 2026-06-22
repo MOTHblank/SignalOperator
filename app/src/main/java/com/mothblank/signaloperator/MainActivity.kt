@@ -308,10 +308,18 @@ class MainActivity : ComponentActivity() {
 
     private fun hideSystemUI() {
         val decorView = window.peekDecorView() ?: return
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowInsetsControllerCompat(window, decorView).let { controller ->
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        if (!decorView.isAttachedToWindow) {
+            decorView.post { hideSystemUI() }
+            return
+        }
+        try {
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            WindowInsetsControllerCompat(window, decorView).let { controller ->
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } catch (e: Exception) {
+            // Prevent crashes if the window/decorView or system insets controller is not fully initialized yet
         }
     }
 }
