@@ -10,6 +10,9 @@ import androidx.compose.ui.unit.dp
 import com.mothblank.signaloperator.models.PuzzleType
 import com.mothblank.signaloperator.models.SignalData
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import com.mothblank.signaloperator.ui.theme.CrtGreen
@@ -359,6 +362,8 @@ fun Decoder(
                         value = input,
                         onValueChange = { input = it },
                         label = { Text(label, color = color) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = color,
                             unfocusedBorderColor = color,
@@ -548,6 +553,8 @@ fun Decoder(
                                     value = input,
                                     onValueChange = { if (it.all { char -> char.isDigit() }) input = it },
                                     label = { Text("ENTER PERCENTAGE (%)", color = color) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = color,
                                         unfocusedBorderColor = color,
