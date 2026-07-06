@@ -4,6 +4,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -460,7 +461,7 @@ fun TerminalMenuItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(
+            .clickable(role = Role.Button,
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
