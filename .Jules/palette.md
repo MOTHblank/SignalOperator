@@ -19,3 +19,7 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2026-07-06 - Semantic Roles for Custom Compose Clickables
 **Learning:** Custom interactive components in Jetpack Compose (such as clickable `Row`s acting as list items or menu options) do not inherently announce themselves as buttons to screen readers, leaving users unaware they can interact with them.
 **Action:** Always append the `semantics { role = Role.Button }` modifier (and appropriate `contentDescription`s when needed) to `.clickable` modifiers on non-standard button elements to ensure proper screen reader identification. Alternatively, you can use the `role` parameter on the `clickable` modifier natively.
+
+## 2026-07-07 - Adding Interactive Map Node Accessibility
+**Learning:** Location nodes that communicate their status purely through text color (`Color.Red` for corrupted, etc.) are invisible to screen readers and difficult for users with impaired vision or color-blindness.
+**Action:** Extract map node UI into distinct components, provide a semantic `Role.Button` combined with `contentDescription` explaining the status textually (e.g., "Status: Corrupted"), and handle `MutableInteractionSource` to create visible active states when the item is hovered or focused via accessibility tools.
