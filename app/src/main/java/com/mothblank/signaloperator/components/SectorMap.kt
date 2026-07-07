@@ -6,15 +6,24 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.mothblank.signaloperator.models.Character
@@ -107,19 +116,12 @@ fun SectorMap(
                 LocationStatus.CORRUPTED -> Color.Red.copy(alpha = 0.8f)
             }
 
-            Box(
-                modifier = Modifier
-                    .offset(x = widthDp * loc.x, y = heightDp * loc.y)
-                    .clickable { onLocationClick(loc) }
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = loc.name,
-                        color = nodeColor,
-                        style = MaterialTheme.typography.labelSmall
-                    )
-                }
-            }
+            SectorMapNode(
+                loc = loc,
+                nodeColor = nodeColor,
+                onLocationClick = { onLocationClick(loc) },
+                modifier = Modifier.offset(x = widthDp * loc.x, y = heightDp * loc.y)
+            )
         }
 
         // Overlay Animated Character Pins
@@ -151,6 +153,50 @@ fun SectorMap(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun SectorMapNode(
+    loc: Location,
+    nodeColor: Color,
+    onLocationClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val isActive = isHovered || isFocused || isPressed
+
+    val statusDescription = when (loc.status) {
+        LocationStatus.SECURE -> "Secure"
+        LocationStatus.INVESTIGATING -> "Under Investigation"
+        LocationStatus.CORRUPTED -> "Corrupted"
+    }
+
+    Box(
+        modifier = modifier
+            .background(if (isActive) nodeColor.copy(alpha = 0.2f) else Color.Transparent)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onLocationClick,
+                role = Role.Button
+            )
+            .padding(4.dp)
+            .semantics {
+                contentDescription = "Location: ${loc.name}, Status: $statusDescription"
+            }
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = if (isActive) "> ${loc.name} <" else loc.name,
+                color = if (isActive) Color.White else nodeColor,
+                style = MaterialTheme.typography.labelSmall
+            )
         }
     }
 }
