@@ -466,7 +466,6 @@ fun TerminalMenuItem(
                 indication = null,
                 onClick = onClick
             )
-            .focusable()
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -612,7 +611,7 @@ fun EndingShutdownScreen(
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
-                .clickable { onBackToMenu() }
+                .clickable(role = Role.Button) { onBackToMenu() }
                 .padding(12.dp)
         )
     }
