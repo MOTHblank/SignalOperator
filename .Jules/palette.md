@@ -23,3 +23,6 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2026-07-07 - Adding Interactive Map Node Accessibility
 **Learning:** Location nodes that communicate their status purely through text color (`Color.Red` for corrupted, etc.) are invisible to screen readers and difficult for users with impaired vision or color-blindness.
 **Action:** Extract map node UI into distinct components, provide a semantic `Role.Button` combined with `contentDescription` explaining the status textually (e.g., "Status: Corrupted"), and handle `MutableInteractionSource` to create visible active states when the item is hovered or focused via accessibility tools.
+## 2024-05-18 - Jetpack Compose Focusable Clickable Redundancy
+**Learning:** In Jetpack Compose, the `Modifier.clickable()` inherently makes the composable focusable. Adding an explicit `.focusable()` modifier when `.clickable()` is already present is redundant and can cause issues like double-focusing for keyboard or screen reader users.
+**Action:** Remove redundant `.focusable()` modifiers from elements that are already using `.clickable()`. Ensure correct semantic roles (e.g. `role = Role.Button`) are applied to clickable elements instead of arbitrary text components to ensure correct screen reader announcements.
