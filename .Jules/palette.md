@@ -26,3 +26,7 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2024-05-18 - Jetpack Compose Focusable Clickable Redundancy
 **Learning:** In Jetpack Compose, the `Modifier.clickable()` inherently makes the composable focusable. Adding an explicit `.focusable()` modifier when `.clickable()` is already present is redundant and can cause issues like double-focusing for keyboard or screen reader users.
 **Action:** Remove redundant `.focusable()` modifiers from elements that are already using `.clickable()`. Ensure correct semantic roles (e.g. `role = Role.Button`) are applied to clickable elements instead of arbitrary text components to ensure correct screen reader announcements.
+
+## 2024-05-18 - Retro Thematic States in Jetpack Compose
+**Learning:** Default Android ripples clash heavily with retro aesthetics (like terminals or oscilloscopes). Using `MutableInteractionSource` to manage `focus`, `hover`, and `press` states, and applying a soft transparent background (e.g. `color.copy(alpha = 0.2f)`) instead of standard Android indications creates a more authentic, cohesive UX while remaining fully accessible to keyboard and switch control users.
+**Action:** Replace default `clickable` ripples with `MutableInteractionSource` background state highlights on custom components requiring retro styling. Ensure `role = Role.Button` and `contentDescription` are provided for these components.
