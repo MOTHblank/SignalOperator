@@ -23,6 +23,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.selection.toggleable
 import com.mothblank.signaloperator.MainViewModel
 import com.mothblank.signaloperator.models.GameState
 import com.mothblank.signaloperator.models.MenuSubScreen
@@ -497,9 +498,19 @@ fun TerminalToggleOption(
     onToggle: () -> Unit,
     color: Color
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .toggleable(
+                value = enabled,
+                role = Role.Switch,
+                onValueChange = { onToggle() }
+            )
+    ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -521,25 +532,22 @@ fun TerminalToggleOption(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            Button(
-                onClick = { onToggle() },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (enabled) color else Color.Transparent
-                ),
-                modifier = Modifier.border(1.dp, color),
+            Surface(
+                color = if (enabled) color else Color.Transparent,
                 shape = MaterialTheme.shapes.extraSmall,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                modifier = Modifier.border(1.dp, color, MaterialTheme.shapes.extraSmall)
             ) {
                 Text(
                     text = if (enabled) "ENABLED" else "DISABLED",
                     color = if (enabled) Color.Black else color,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                 )
             }
         }
-        HorizontalDivider(color = color.copy(alpha = 0.15f), modifier = Modifier.padding(top = 12.dp))
+        HorizontalDivider(color = color.copy(alpha = 0.15f), modifier = Modifier.padding(top = 4.dp))
     }
 }
 
