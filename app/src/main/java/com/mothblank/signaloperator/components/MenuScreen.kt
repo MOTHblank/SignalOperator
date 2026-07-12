@@ -330,17 +330,14 @@ fun HighscoresLayout(
         )
 
         // Table Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("OP ID", color = color.copy(alpha = 0.7f), fontFamily = FontFamily.Monospace, fontSize = 12.sp, modifier = Modifier.weight(1.5f))
-            Text("PHASE", color = color.copy(alpha = 0.7f), fontFamily = FontFamily.Monospace, fontSize = 12.sp, modifier = Modifier.weight(2f))
-            Text("INTEL", color = color.copy(alpha = 0.7f), fontFamily = FontFamily.Monospace, fontSize = 12.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-            Text("SCORE", color = color.copy(alpha = 0.7f), fontFamily = FontFamily.Monospace, fontSize = 12.sp, modifier = Modifier.weight(1.5f), textAlign = TextAlign.End)
-        }
+        HighscoreTableRow(
+            col1 = "OP ID",
+            col2 = "PHASE",
+            col3 = "INTEL",
+            col4 = "SCORE",
+            color = color,
+            isHeader = true
+        )
 
         HorizontalDivider(color = color, modifier = Modifier.padding(bottom = 8.dp))
 
@@ -362,15 +359,14 @@ fun HighscoresLayout(
                 )
             } else {
                 highscores.forEachIndexed { index, entry ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("${index + 1}. ${entry.operatorId}", color = color, fontFamily = FontFamily.Monospace, fontSize = 13.sp, modifier = Modifier.weight(1.5f))
-                        Text(entry.maxPhase, color = color, fontFamily = FontFamily.Monospace, fontSize = 13.sp, modifier = Modifier.weight(2f))
-                        Text(entry.intelSaved.toString(), color = color, fontFamily = FontFamily.Monospace, fontSize = 13.sp, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-                        Text(entry.score.toString(), color = color, fontFamily = FontFamily.Monospace, fontSize = 13.sp, modifier = Modifier.weight(1.5f), textAlign = TextAlign.End)
-                    }
+                    HighscoreTableRow(
+                        col1 = "${index + 1}. ${entry.operatorId}",
+                        col2 = entry.maxPhase,
+                        col3 = entry.intelSaved.toString(),
+                        col4 = entry.score.toString(),
+                        color = color,
+                        isHeader = false
+                    )
                 }
             }
         }
@@ -390,6 +386,31 @@ fun HighscoresLayout(
         ) {
             Text("RETURN TO SESSION INDEX", color = color, fontFamily = FontFamily.Monospace)
         }
+    }
+}
+
+@Composable
+fun HighscoreTableRow(
+    col1: String,
+    col2: String,
+    col3: String,
+    col4: String,
+    color: Color,
+    isHeader: Boolean
+) {
+    val textColor = if (isHeader) color.copy(alpha = 0.7f) else color
+    val textSize = if (isHeader) 12.sp else 13.sp
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (isHeader) Modifier.padding(vertical = 4.dp) else Modifier),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(col1, color = textColor, fontFamily = FontFamily.Monospace, fontSize = textSize, modifier = Modifier.weight(1.5f))
+        Text(col2, color = textColor, fontFamily = FontFamily.Monospace, fontSize = textSize, modifier = Modifier.weight(2f))
+        Text(col3, color = textColor, fontFamily = FontFamily.Monospace, fontSize = textSize, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+        Text(col4, color = textColor, fontFamily = FontFamily.Monospace, fontSize = textSize, modifier = Modifier.weight(1.5f), textAlign = TextAlign.End)
     }
 }
 
