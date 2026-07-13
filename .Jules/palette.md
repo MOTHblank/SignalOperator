@@ -34,3 +34,7 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2024-07-12 - Proper semantics for full-row toggles in Jetpack Compose
 **Learning:** When creating settings menu options with a text label and a visual toggle indicator (like an "Enabled/Disabled" button), placing a clickable `Button` inside a `Row` forces users to tap a small touch target. This also causes screen readers to announce a generic button rather than a toggleable switch state. Wrapping the entire row in `Modifier.toggleable(role = Role.Switch)` expands the touch target to the full width of the item and provides proper binary state semantics for accessibility services.
 **Action:** Replace nested `Button` elements inside settings rows with non-interactive UI representations (like `Surface` or `Box`), and apply `Modifier.toggleable` to the parent container with `Role.Switch` for improved touch UX and a11y.
+
+## 2024-07-13 - Dynamic Accessibility for Compose Overlay Intercepts
+**Learning:** In full-screen Jetpack Compose overlays where tapping anywhere progresses the state (e.g., skipping typing animations vs. advancing dialog), standard `clickable` modifiers lack screen reader context. Users reliant on TalkBack will just hear "Double tap to activate" without knowing what the action does.
+**Action:** Use `.semantics { contentDescription = if (state) "Action A" else "Action B" }` alongside `role = Role.Button` on overlay containers to provide clear, state-aware context to screen reader users.
