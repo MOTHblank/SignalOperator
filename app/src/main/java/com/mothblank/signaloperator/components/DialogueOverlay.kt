@@ -11,6 +11,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,12 +65,15 @@ fun DialogueOverlay(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
-            .clickable {
+            .clickable(role = Role.Button) {
                 if (!isDoneTyping) {
                     visibleTextLength = fullText.length
                 } else {
                     onNext()
                 }
+            }
+            .semantics {
+                contentDescription = if (!isDoneTyping) "Skip typing dialogue" else "Continue dialogue"
             }
             .padding(24.dp),
         contentAlignment = Alignment.Center
@@ -137,7 +143,7 @@ fun DialogueOverlay(
                     color = if (isDoneTyping) color else Color.Transparent,
                     modifier = Modifier
                         .border(1.dp, color)
-                        .clickable(enabled = isDoneTyping) {
+                        .clickable(enabled = isDoneTyping, role = Role.Button) {
                             onNext()
                         }
                         .padding(horizontal = 16.dp, vertical = 8.dp)
