@@ -498,12 +498,22 @@ fun TerminalToggleOption(
     onToggle: () -> Unit,
     color: Color
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val isActive = isHovered || isFocused || isPressed
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .background(if (isActive) color.copy(alpha = 0.15f) else Color.Transparent)
             .toggleable(
                 value = enabled,
                 role = Role.Switch,
+                interactionSource = interactionSource,
+                indication = null,
                 onValueChange = { onToggle() }
             )
     ) {
