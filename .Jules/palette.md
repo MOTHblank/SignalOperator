@@ -38,3 +38,7 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2024-07-13 - Dynamic Accessibility for Compose Overlay Intercepts
 **Learning:** In full-screen Jetpack Compose overlays where tapping anywhere progresses the state (e.g., skipping typing animations vs. advancing dialog), standard `clickable` modifiers lack screen reader context. Users reliant on TalkBack will just hear "Double tap to activate" without knowing what the action does.
 **Action:** Use `.semantics { contentDescription = if (state) "Action A" else "Action B" }` alongside `role = Role.Button` on overlay containers to provide clear, state-aware context to screen reader users.
+
+## 2024-07-25 - Contextual Disabled States for Retro UI Elements
+**Learning:** In immersive retro-styled applications, simply preventing action when criteria (like stability in an oscilloscope simulation) aren't met can feel like an unresponsive bug if the UI lacks visual disabled feedback. However, default Android disabled styling often breaks the custom monochromatic CRT aesthetic.
+**Action:** When adding `enabled = false` to Jetpack Compose elements in custom retro views, ensure custom colors for `disabledContainerColor` and `disabledContentColor` are explicitly defined (e.g. `color.copy(alpha = 0.2f)` and `color.copy(alpha = 0.5f)`). This maintains visual coherence while clearly communicating interactive boundaries to the user.
