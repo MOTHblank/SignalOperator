@@ -4,6 +4,10 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -61,11 +65,17 @@ fun DialogueOverlay(
         label = "cursor_alpha"
     )
 
+    val screenInteractionSource = remember { MutableInteractionSource() }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
-            .clickable(role = Role.Button) {
+            .clickable(
+                interactionSource = screenInteractionSource,
+                indication = null,
+                role = Role.Button
+            ) {
                 if (!isDoneTyping) {
                     visibleTextLength = fullText.length
                 } else {
@@ -139,18 +149,34 @@ fun DialogueOverlay(
                     fontSize = 11.sp
                 )
 
-                Surface(
-                    color = if (isDoneTyping) color else Color.Transparent,
+                val ackInteractionSource = remember { MutableInteractionSource() }
+                val isHovered by ackInteractionSource.collectIsHoveredAsState()
+                val isFocused by ackInteractionSource.collectIsFocusedAsState()
+                val isPressed by ackInteractionSource.collectIsPressedAsState()
+                val isActive = isHovered || isFocused || isPressed
+
+                val backgroundColor = if (!isDoneTyping) Color.Transparent
+                    else if (isActive) color.copy(alpha = 0.8f)
+                    else color
+                val textColor = if (!isDoneTyping) color.copy(alpha = 0.5f) else Color.Black
+
+                Box(
                     modifier = Modifier
                         .border(1.dp, color)
-                        .clickable(enabled = isDoneTyping, role = Role.Button) {
+                        .background(backgroundColor)
+                        .clickable(
+                            enabled = isDoneTyping,
+                            interactionSource = ackInteractionSource,
+                            indication = null,
+                            role = Role.Button
+                        ) {
                             onNext()
                         }
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = "ACKNOWLEDGE >",
-                        color = if (isDoneTyping) Color.Black else color.copy(alpha = 0.5f),
+                        color = textColor,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
