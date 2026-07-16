@@ -711,14 +711,22 @@ fun Decoder(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    val canCommit = stability >= 95f
                     Button(
                         onClick = {
-                            lastSubmittedInput = input
-                            onAction("COMMIT", input)
+                            if (canCommit) {
+                                lastSubmittedInput = input
+                                onAction("COMMIT", input)
+                            }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = color)
+                        enabled = canCommit,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = color,
+                            disabledContainerColor = color.copy(alpha = 0.2f),
+                            disabledContentColor = color.copy(alpha = 0.5f)
+                        )
                     ) {
-                        Text("COMMIT INTEL", color = Color.Black)
+                        Text("COMMIT INTEL", color = if (canCommit) Color.Black else color.copy(alpha = 0.5f))
                     }
                     Button(onClick = { onAction("DISCARD", input) }, colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) {
                         Text("DISCARD", color = Color.White)
