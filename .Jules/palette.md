@@ -42,3 +42,7 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2024-07-25 - Contextual Disabled States for Retro UI Elements
 **Learning:** In immersive retro-styled applications, simply preventing action when criteria (like stability in an oscilloscope simulation) aren't met can feel like an unresponsive bug if the UI lacks visual disabled feedback. However, default Android disabled styling often breaks the custom monochromatic CRT aesthetic.
 **Action:** When adding `enabled = false` to Jetpack Compose elements in custom retro views, ensure custom colors for `disabledContainerColor` and `disabledContentColor` are explicitly defined (e.g. `color.copy(alpha = 0.2f)` and `color.copy(alpha = 0.5f)`). This maintains visual coherence while clearly communicating interactive boundaries to the user.
+
+## 2024-07-28 - Explicit Semantics for ASCII Art and Dynamic Text
+**Learning:** Decorative text elements like ASCII art logos and rapidly updating thematic text (e.g., blinking cursor characters) create severe accessibility issues. Screen readers will read every individual character of ASCII art (slashes, underscores) and will constantly re-announce UI elements that rapidly update (like a blinking `█` cursor), resulting in unnavigable screen reader spam.
+**Action:** Always use `Modifier.clearAndSetSemantics { contentDescription = "..." }` on ASCII art and rapidly blinking thematic text components to hide the raw text representation and provide a clean, static, and meaningful description to accessibility services.
