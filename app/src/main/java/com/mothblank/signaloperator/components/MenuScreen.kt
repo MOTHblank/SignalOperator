@@ -24,6 +24,8 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import com.mothblank.signaloperator.MainViewModel
 import com.mothblank.signaloperator.models.GameState
 import com.mothblank.signaloperator.models.MenuSubScreen
@@ -99,6 +101,7 @@ fun MainMenuLayout(
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(bottom = 24.dp)
+                .clearAndSetSemantics { contentDescription = "Signal Operator Title Logo" }
         )
 
         Text(
@@ -174,7 +177,8 @@ fun MainMenuLayout(
             text = "OPERATOR_LOGGED_IN: OP-814${if (showCursor) "█" else " "}",
             color = color,
             fontFamily = FontFamily.Monospace,
-            fontSize = 12.sp
+            fontSize = 12.sp,
+            modifier = Modifier.clearAndSetSemantics { contentDescription = "Operator logged in: OP-814" }
         )
     }
 }
