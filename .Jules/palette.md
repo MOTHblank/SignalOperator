@@ -46,3 +46,7 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2024-07-28 - Explicit Semantics for ASCII Art and Dynamic Text
 **Learning:** Decorative text elements like ASCII art logos and rapidly updating thematic text (e.g., blinking cursor characters) create severe accessibility issues. Screen readers will read every individual character of ASCII art (slashes, underscores) and will constantly re-announce UI elements that rapidly update (like a blinking `█` cursor), resulting in unnavigable screen reader spam.
 **Action:** Always use `Modifier.clearAndSetSemantics { contentDescription = "..." }` on ASCII art and rapidly blinking thematic text components to hide the raw text representation and provide a clean, static, and meaningful description to accessibility services.
+
+## 2024-07-28 - Explicit Semantics for Typewriter Text Animations
+**Learning:** Animated "typewriter" text sequences that append characters sequentially create severe accessibility issues. Screen readers will attempt to read each fragment as it updates, resulting in an unnavigable stutter of repeated incomplete sentences.
+**Action:** Always use `Modifier.clearAndSetSemantics { contentDescription = fullText }` on `Text` components containing typewriter animations to hide the dynamically updating raw text representation and provide the complete static text to accessibility services immediately.
