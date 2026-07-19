@@ -626,15 +626,27 @@ fun EndingShutdownScreen(
             label = "ending_alpha"
         )
 
+        val interactionSource = remember { MutableInteractionSource() }
+        val isHovered by interactionSource.collectIsHoveredAsState()
+        val isFocused by interactionSource.collectIsFocusedAsState()
+        val isPressed by interactionSource.collectIsPressedAsState()
+        val isActive = isHovered || isFocused || isPressed
+
         Text(
             text = "> PRESS HERE TO RETURN TO INDEX <",
-            color = color.copy(alpha = blinkAlpha),
+            color = if (isActive) Color.Black else color.copy(alpha = blinkAlpha),
             fontFamily = FontFamily.Monospace,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
-                .clickable(role = Role.Button) { onBackToMenu() }
+                .background(if (isActive) color else Color.Transparent)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    role = Role.Button
+                ) { onBackToMenu() }
                 .padding(12.dp)
+                .clearAndSetSemantics { contentDescription = "Return to index" }
         )
     }
 }
