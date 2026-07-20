@@ -13,6 +13,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 
 @Composable
 fun HelpOverlay(
@@ -39,7 +41,8 @@ fun HelpOverlay(
                     color = color,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 15.sp,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.clearAndSetSemantics { contentDescription = title.replace("===", "").trim() }
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))

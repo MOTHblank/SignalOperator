@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -332,7 +334,7 @@ fun HighscoresLayout(
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 16.dp).clearAndSetSemantics { contentDescription = "OPERATOR COGNITIVE RECORDS" }
         )
 
         // Table Header
@@ -418,7 +420,7 @@ fun HelpLayout(
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 16.dp).clearAndSetSemantics { contentDescription = "FIELD OPERATIONAL PROTOCOLS" }
         )
 
         Column(
@@ -593,7 +595,7 @@ fun EndingShutdownScreen(
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier.padding(bottom = 24.dp).clearAndSetSemantics { contentDescription = title.replace("===", "").trim() }
         )
 
         Box(
