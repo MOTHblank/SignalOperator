@@ -15,7 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -70,7 +70,7 @@ fun TerminalRow(
                 onClick = onClick
             )
             .padding(horizontal = 4.dp, vertical = 2.dp)
-            .semantics {
+            .clearAndSetSemantics {
                 contentDescription = "Log entry: ${log.text} at ${log.timestamp}"
             },
         horizontalArrangement = Arrangement.SpaceBetween,

@@ -50,3 +50,7 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2024-07-28 - Explicit Semantics for Typewriter Text Animations
 **Learning:** Animated "typewriter" text sequences that append characters sequentially create severe accessibility issues. Screen readers will attempt to read each fragment as it updates, resulting in an unnavigable stutter of repeated incomplete sentences.
 **Action:** Always use `Modifier.clearAndSetSemantics { contentDescription = fullText }` on `Text` components containing typewriter animations to hide the dynamically updating raw text representation and provide the complete static text to accessibility services immediately.
+
+## 2024-10-24 - Overriding Semantics in Interactive ASCII Components
+**Learning:** In custom interactive components that include decorative dynamic ASCII art (like "▮" or ">"), using the standard `semantics` modifier merges the custom content description with the text contents of the component. When focus or hover states change, screen readers will often read out these decorative characters alongside the custom description.
+**Action:** Use `Modifier.clearAndSetSemantics` instead of `semantics` in custom interactive components to completely override the default semantics and prevent screen readers from reading out decorative characters when focus/hover states change.
