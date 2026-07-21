@@ -473,7 +473,8 @@ fun TerminalMenuItem(
                 indication = null,
                 onClick = onClick
             )
-            .padding(vertical = 6.dp),
+            .padding(vertical = 6.dp)
+            .clearAndSetSemantics { contentDescription = label },
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
@@ -522,6 +523,9 @@ fun TerminalToggleOption(
                 indication = null,
                 onValueChange = { onToggle() }
             )
+            .clearAndSetSemantics {
+                contentDescription = "$label, $description."
+            }
     ) {
         Row(
             modifier = Modifier
