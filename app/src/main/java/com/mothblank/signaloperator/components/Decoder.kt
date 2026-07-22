@@ -7,6 +7,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import com.mothblank.signaloperator.models.PuzzleType
 import com.mothblank.signaloperator.models.SignalData
 import kotlinx.coroutines.delay
@@ -189,11 +191,13 @@ fun Decoder(
                     val hint = getDecoderHint(signal, stability, downloadProgress)
                     onShowHint(hint.first, hint.second)
                 },
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp).clearAndSetSemantics {
+                    contentDescription = "Decoder Information"
+                }
             ) {
                 Icon(
                     imageVector = Icons.Default.Info,
-                    contentDescription = "Decoder Information",
+                    contentDescription = null,
                     tint = color.copy(alpha = 0.7f),
                     modifier = Modifier.size(16.dp)
                 )
