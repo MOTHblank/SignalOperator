@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import com.mothblank.signaloperator.components.*
 import com.mothblank.signaloperator.models.GamePhase
 import com.mothblank.signaloperator.models.MenuSubScreen
@@ -232,10 +234,15 @@ class MainActivity : ComponentActivity() {
                             }
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { viewModel.toggleMapView() }) {
+                                IconButton(
+                                    onClick = { viewModel.toggleMapView() },
+                                    modifier = Modifier.clearAndSetSemantics {
+                                        contentDescription = if (isMapViewActive) "Close Map View" else "Open Map View"
+                                    }
+                                ) {
                                     Icon(
                                         Icons.Default.Place,
-                                        if (isMapViewActive) "Close Map View" else "Open Map View",
+                                        contentDescription = null,
                                         tint = if (isMapViewActive) Color.White else currentColor
                                     )
                                 }

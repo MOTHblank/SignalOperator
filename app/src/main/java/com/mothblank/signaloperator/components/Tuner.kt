@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
@@ -49,11 +51,13 @@ fun FrequencyTuner(
                     Spacer(modifier = Modifier.width(6.dp))
                     IconButton(
                         onClick = onShowHint,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp).clearAndSetSemantics {
+                            contentDescription = "Tuning Information"
+                        }
                     ) {
                         Icon(
                             imageVector = Icons.Default.Info,
-                            contentDescription = "Tuning Information",
+                            contentDescription = null,
                             tint = color.copy(alpha = 0.7f),
                             modifier = Modifier.size(16.dp)
                         )
