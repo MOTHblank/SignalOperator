@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -144,7 +145,7 @@ fun RouterModal(
                                                 onClick = { onRotateTile(x, y) },
                                                 role = Role.Button
                                             )
-                                            .semantics {
+                                            .clearAndSetSemantics {
                                                 contentDescription = "Router tile ${tile.type.name} at column $x row $y"
                                             }
                                     )
