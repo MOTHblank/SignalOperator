@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
@@ -187,7 +188,7 @@ fun SectorMapNode(
                 role = Role.Button
             )
             .padding(4.dp)
-            .semantics {
+            .clearAndSetSemantics {
                 contentDescription = "Location: ${loc.name}, Status: $statusDescription"
             }
     ) {
