@@ -177,6 +177,9 @@ fun DialogueOverlay(
                             onNext()
                         }
                         .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clearAndSetSemantics {
+                            contentDescription = "Acknowledge transmission"
+                        }
                 ) {
                     Text(
                         text = "ACKNOWLEDGE >",
