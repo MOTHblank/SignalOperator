@@ -26,6 +26,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import com.mothblank.signaloperator.MainViewModel
@@ -468,6 +469,7 @@ fun TerminalMenuItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .minimumInteractiveComponentSize()
             .clickable(role = Role.Button,
                 interactionSource = interactionSource,
                 indication = null,
@@ -516,6 +518,7 @@ fun TerminalToggleOption(
         modifier = Modifier
             .fillMaxWidth()
             .background(if (isActive) color.copy(alpha = 0.15f) else Color.Transparent)
+            .minimumInteractiveComponentSize()
             .toggleable(
                 value = enabled,
                 role = Role.Switch,
@@ -646,6 +649,7 @@ fun EndingShutdownScreen(
             fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .background(if (isActive) color else Color.Transparent)
+                .minimumInteractiveComponentSize()
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,

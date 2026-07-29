@@ -13,6 +13,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -181,6 +182,7 @@ fun SectorMapNode(
     Box(
         modifier = modifier
             .background(if (isActive) nodeColor.copy(alpha = 0.2f) else Color.Transparent)
+            .minimumInteractiveComponentSize()
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
