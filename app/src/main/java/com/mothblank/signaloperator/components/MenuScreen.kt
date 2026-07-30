@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -468,6 +469,7 @@ fun TerminalMenuItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .minimumInteractiveComponentSize()
             .clickable(role = Role.Button,
                 interactionSource = interactionSource,
                 indication = null,
@@ -646,6 +648,7 @@ fun EndingShutdownScreen(
             fontWeight = FontWeight.Bold,
             modifier = Modifier
                 .background(if (isActive) color else Color.Transparent)
+                .minimumInteractiveComponentSize()
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,

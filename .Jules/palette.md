@@ -54,3 +54,7 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2024-10-24 - Overriding Semantics in Interactive ASCII Components
 **Learning:** In custom interactive components that include decorative dynamic ASCII art (like "▮" or ">"), using the standard `semantics` modifier merges the custom content description with the text contents of the component. When focus or hover states change, screen readers will often read out these decorative characters alongside the custom description.
 **Action:** Use `Modifier.clearAndSetSemantics` instead of `semantics` in custom interactive components to completely override the default semantics and prevent screen readers from reading out decorative characters when focus/hover states change.
+
+## 2024-10-25 - Using minimumInteractiveComponentSize() on Custom Clickables
+**Learning:** When building custom interactive elements out of foundational Compose layout primitives like `Row` or `Box`, raw `.clickable()` modifiers do not enforce accessibility touch target minimums. This can result in tiny interactable areas that violate the 48x48dp mobile standard.
+**Action:** Apply `Modifier.minimumInteractiveComponentSize()` before `.clickable()` on custom touch targets to ensure accessibility standards are met while preserving exact visual sizing.

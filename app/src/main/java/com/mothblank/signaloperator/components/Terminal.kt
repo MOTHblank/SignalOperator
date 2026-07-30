@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -64,6 +65,7 @@ fun TerminalRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(if (isActive) color.copy(alpha = 0.15f) else Color.Transparent)
+            .minimumInteractiveComponentSize()
             .clickable(role = Role.Button,
                 interactionSource = interactionSource,
                 indication = null,
