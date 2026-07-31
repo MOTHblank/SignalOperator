@@ -1,10 +1,15 @@
 package com.mothblank.signaloperator.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -13,6 +18,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -69,21 +75,26 @@ fun HelpOverlay(
                 val isPressed by interactionSource.collectIsPressedAsState()
                 val isActive = isHovered || isFocused || isPressed
 
-                Button(
-                    onClick = onDismiss,
-                    interactionSource = interactionSource,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isActive) color else color.copy(alpha = 0.1f),
-                        contentColor = if (isActive) Color.Black else color
-                    ),
+                val backgroundColor = if (isActive) color else color.copy(alpha = 0.1f)
+                val textColor = if (isActive) Color.Black else color
+
+                Box(
                     modifier = Modifier
                         .align(Alignment.End)
-                        .border(1.dp, color),
-                    shape = MaterialTheme.shapes.extraSmall,
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        .border(1.dp, color, MaterialTheme.shapes.extraSmall)
+                        .background(backgroundColor, MaterialTheme.shapes.extraSmall)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            role = Role.Button,
+                            onClick = onDismiss
+                        )
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "CLOSE INTERCEPT INFO",
+                        color = textColor,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp
                     )
