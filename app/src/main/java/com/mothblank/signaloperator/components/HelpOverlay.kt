@@ -15,6 +15,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 
 @Composable
 fun HelpOverlay(
@@ -57,9 +63,19 @@ fun HelpOverlay(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                val interactionSource = remember { MutableInteractionSource() }
+                val isHovered by interactionSource.collectIsHoveredAsState()
+                val isFocused by interactionSource.collectIsFocusedAsState()
+                val isPressed by interactionSource.collectIsPressedAsState()
+                val isActive = isHovered || isFocused || isPressed
+
                 Button(
                     onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = color.copy(alpha = 0.1f)),
+                    interactionSource = interactionSource,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isActive) color else color.copy(alpha = 0.1f),
+                        contentColor = if (isActive) Color.Black else color
+                    ),
                     modifier = Modifier
                         .align(Alignment.End)
                         .border(1.dp, color),
@@ -68,7 +84,6 @@ fun HelpOverlay(
                 ) {
                     Text(
                         text = "CLOSE INTERCEPT INFO",
-                        color = color,
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp
                     )
