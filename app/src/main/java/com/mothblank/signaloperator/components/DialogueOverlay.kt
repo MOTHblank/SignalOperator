@@ -10,6 +10,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -168,6 +169,7 @@ fun DialogueOverlay(
                     modifier = Modifier
                         .border(1.dp, color)
                         .background(backgroundColor)
+                        .minimumInteractiveComponentSize()
                         .clickable(
                             enabled = isDoneTyping,
                             interactionSource = ackInteractionSource,

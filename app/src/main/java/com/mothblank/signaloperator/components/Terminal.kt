@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -64,6 +65,7 @@ fun TerminalRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(if (isActive) color.copy(alpha = 0.15f) else Color.Transparent)
+            .minimumInteractiveComponentSize()
             .clickable(role = Role.Button,
                 interactionSource = interactionSource,
                 indication = null,
