@@ -193,7 +193,7 @@ fun Decoder(
             ) {
                 Icon(
                     imageVector = Icons.Default.Info,
-                    contentDescription = "Decoder Information",
+                    contentDescription = "Open Decoder Information",
                     tint = color.copy(alpha = 0.7f),
                     modifier = Modifier.size(16.dp)
                 )

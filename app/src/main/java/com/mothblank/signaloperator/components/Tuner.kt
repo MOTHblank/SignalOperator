@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
@@ -53,7 +55,7 @@ fun FrequencyTuner(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Info,
-                            contentDescription = "Tuning Information",
+                            contentDescription = "Open Tuning Information",
                             tint = color.copy(alpha = 0.7f),
                             modifier = Modifier.size(16.dp)
                         )
@@ -99,7 +101,7 @@ fun FrequencyTuner(
                 activeTrackColor = color,
                 inactiveTrackColor = color.copy(alpha = 0.2f)
             ),
-            modifier = Modifier.padding(vertical = 2.dp)
+            modifier = Modifier.padding(vertical = 2.dp).semantics { contentDescription = "Frequency Tuner" }
         )
 
         // Custom scale dial
@@ -207,7 +209,14 @@ fun StabilizerTuner(
                 onValueChange = { setGain(it.toInt()) },
                 valueRange = 0f..100f,
                 enabled = isLocked,
-                colors = SliderDefaults.colors(thumbColor = color, activeTrackColor = color)
+                colors = SliderDefaults.colors(
+                    thumbColor = color,
+                    activeTrackColor = color,
+                    disabledThumbColor = color.copy(alpha = 0.5f),
+                    disabledActiveTrackColor = color.copy(alpha = 0.5f),
+                    disabledInactiveTrackColor = color.copy(alpha = 0.2f)
+                ),
+                modifier = Modifier.semantics { contentDescription = "Gain Stabilizer" }
             )
         }
         Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
@@ -217,7 +226,14 @@ fun StabilizerTuner(
                 onValueChange = { setFilter(it.toInt()) },
                 valueRange = 0f..100f,
                 enabled = isLocked,
-                colors = SliderDefaults.colors(thumbColor = color, activeTrackColor = color)
+                colors = SliderDefaults.colors(
+                    thumbColor = color,
+                    activeTrackColor = color,
+                    disabledThumbColor = color.copy(alpha = 0.5f),
+                    disabledActiveTrackColor = color.copy(alpha = 0.5f),
+                    disabledInactiveTrackColor = color.copy(alpha = 0.2f)
+                ),
+                modifier = Modifier.semantics { contentDescription = "Filter Stabilizer" }
             )
         }
     }

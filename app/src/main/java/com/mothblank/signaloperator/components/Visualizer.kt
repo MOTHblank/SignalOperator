@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlin.math.sin
 import com.mothblank.signaloperator.models.SignalData
@@ -33,6 +35,7 @@ fun Visualizer(
         .fillMaxWidth()
         .padding(horizontal = 8.dp, vertical = 0.dp)
         .border(1.dp, color.copy(alpha = 0.5f))
+        .semantics { contentDescription = "Oscilloscope Waveform Visualizer" }
     ) {
         val width = size.width
         val height = size.height
