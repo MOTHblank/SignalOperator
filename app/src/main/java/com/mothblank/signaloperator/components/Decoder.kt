@@ -660,12 +660,11 @@ fun Decoder(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("GRID: $input", color = color, style = MaterialTheme.typography.titleMedium)
-                                Button(
+                                TerminalButton(
+                                    text = "CLEAR",
                                     onClick = { input = "" },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                                ) {
-                                    Text("CLEAR", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                                }
+                                    color = Color.White
+                                )
                             }
                         } else {
                             Text("REPLICATE SEQUENCE:", color = color.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
@@ -697,12 +696,11 @@ fun Decoder(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("SEQUENCE: $input", color = color, style = MaterialTheme.typography.titleLarge)
-                                Button(
+                                TerminalButton(
+                                    text = "CLEAR",
                                     onClick = { input = "" },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                                ) {
-                                    Text("CLEAR", color = Color.White, style = MaterialTheme.typography.labelSmall)
-                                }
+                                    color = Color.White
+                                )
                             }
                         }
                     }
@@ -712,25 +710,24 @@ fun Decoder(
 
                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     val canCommit = stability >= 95f
-                    Button(
+                    TerminalButton(
+                        text = "COMMIT INTEL",
                         onClick = {
                             if (canCommit) {
                                 lastSubmittedInput = input
                                 onAction("COMMIT", input)
                             }
                         },
+                        color = color,
                         enabled = canCommit,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = color,
-                            disabledContainerColor = color.copy(alpha = 0.2f),
-                            disabledContentColor = color.copy(alpha = 0.5f)
-                        )
-                    ) {
-                        Text("COMMIT INTEL", color = if (canCommit) Color.Black else color.copy(alpha = 0.5f))
-                    }
-                    Button(onClick = { onAction("DISCARD", input) }, colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) {
-                        Text("DISCARD", color = Color.White)
-                    }
+                        useBrackets = true
+                    )
+                    TerminalButton(
+                        text = "DISCARD",
+                        onClick = { onAction("DISCARD", input) },
+                        color = Color.White,
+                        useBrackets = true
+                    )
                 }
 
                 val isMatch = if (signal.metadata.startsWith("INTERVIEW_QUESTION")) {
