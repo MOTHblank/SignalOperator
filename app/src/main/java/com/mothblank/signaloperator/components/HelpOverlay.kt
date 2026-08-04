@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+
+
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -69,36 +71,13 @@ fun HelpOverlay(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                val interactionSource = remember { MutableInteractionSource() }
-                val isHovered by interactionSource.collectIsHoveredAsState()
-                val isFocused by interactionSource.collectIsFocusedAsState()
-                val isPressed by interactionSource.collectIsPressedAsState()
-                val isActive = isHovered || isFocused || isPressed
-
-                val backgroundColor = if (isActive) color else color.copy(alpha = 0.1f)
-                val textColor = if (isActive) Color.Black else color
-
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.End)
-                        .border(1.dp, color, MaterialTheme.shapes.extraSmall)
-                        .background(backgroundColor, MaterialTheme.shapes.extraSmall)
-                        .clickable(
-                            interactionSource = interactionSource,
-                            indication = null,
-                            role = Role.Button,
-                            onClick = onDismiss
-                        )
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "CLOSE INTERCEPT INFO",
-                        color = textColor,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp
-                    )
-                }
+                TerminalButton(
+                    text = "CLOSE INTERCEPT INFO",
+                    onClick = onDismiss,
+                    color = color,
+                    useBrackets = true,
+                    modifier = Modifier.align(Alignment.End)
+                )
             }
         }
     }

@@ -24,6 +24,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.mothblank.signaloperator.models.RouterGameState
@@ -157,12 +158,12 @@ fun RouterModal(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Button(
+            TerminalButton(
+                text = "ABORT ATTEMPT",
                 onClick = onClose,
-                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-            ) {
-                Text("ABORT ATTEMPT", color = Color.White)
-            }
+                color = Color.White,
+                useBrackets = true
+            )
         }
     }
 }

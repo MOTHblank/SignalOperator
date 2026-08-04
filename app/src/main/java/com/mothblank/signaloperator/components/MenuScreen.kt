@@ -6,6 +6,10 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+
+
+
+
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -107,20 +111,22 @@ fun MainMenuLayout(
                 .clearAndSetSemantics { contentDescription = "Signal Operator Title Logo" }
         )
 
-        Text(
+        TypewriterText(
             text = "SECURITY SESSION TERMINAL ACCESS v2.8",
             color = color.copy(alpha = 0.6f),
-            fontFamily = FontFamily.Monospace,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(bottom = 32.dp)
+            showCursor = true,
+            style = androidx.compose.ui.text.TextStyle(
+                fontFamily = FontFamily.Monospace,
+                fontSize = 11.sp
+            ),
+            modifier = Modifier.padding(bottom = 32.dp).clearAndSetSemantics { contentDescription = "Security session terminal access version 2.8" }
         )
 
         // Terminal Prompt Box
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .border(1.dp, color.copy(alpha = 0.3f))
-                .padding(16.dp)
+        TerminalCard(
+            title = "SYSTEM COMMANDS",
+            color = color,
+            modifier = Modifier.fillMaxWidth(0.9f)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 TerminalMenuItem(
@@ -201,21 +207,26 @@ fun OptionsLayout(
                 showResetConfirm = false
             },
             confirmButton = {
-                TextButton(onClick = {
-                    viewModel.playClick()
-                    viewModel.clearData()
-                    showResetConfirm = false
-                }) {
-                    Text("YES, WIPE MEMORY", color = Color.Red, fontFamily = FontFamily.Monospace)
-                }
+                TerminalButton(
+                    text = "YES, WIPE MEMORY",
+                    onClick = {
+                        viewModel.playClick()
+                        viewModel.clearData()
+                        showResetConfirm = false
+                    },
+                    color = Color.Red,
+                    useBrackets = true
+                )
             },
             dismissButton = {
-                TextButton(onClick = {
-                    viewModel.playClick()
-                    showResetConfirm = false
-                }) {
-                    Text("CANCEL", color = color, fontFamily = FontFamily.Monospace)
-                }
+                TerminalButton(
+                    text = "CANCEL",
+                    onClick = {
+                        viewModel.playClick()
+                        showResetConfirm = false
+                    },
+                    color = color
+                )
             },
             title = {
                 Text("CAUTION: SECURE DATA PURGE", color = Color.Red, fontFamily = FontFamily.Monospace)
@@ -283,33 +294,27 @@ fun OptionsLayout(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Button(
+            TerminalButton(
+                text = "RESET HARDWARE MEMORY",
                 onClick = {
                     viewModel.playAlert()
                     showResetConfirm = true
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.15f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, Color.Red),
-                shape = MaterialTheme.shapes.extraSmall
-            ) {
-                Text("RESET HARDWARE MEMORY", color = Color.Red, fontFamily = FontFamily.Monospace)
-            }
+                color = Color.Red,
+                fillWidth = true,
+                useBrackets = true
+            )
 
-            Button(
+            TerminalButton(
+                text = "BACK TO TERMINAL",
                 onClick = {
                     viewModel.playClick()
                     viewModel.setMenuScreen(MenuSubScreen.MAIN)
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = color.copy(alpha = 0.1f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, color),
-                shape = MaterialTheme.shapes.extraSmall
-            ) {
-                Text("RETURN TO SESSION INDEX", color = color, fontFamily = FontFamily.Monospace)
-            }
+                color = color,
+                fillWidth = true,
+                useBrackets = true
+            )
         }
     }
 }
@@ -386,19 +391,16 @@ fun HighscoresLayout(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(
+        TerminalButton(
+            text = "BACK TO TERMINAL",
             onClick = {
                 viewModel.playClick()
                 viewModel.setMenuScreen(MenuSubScreen.MAIN)
             },
-            colors = ButtonDefaults.buttonColors(containerColor = color.copy(alpha = 0.1f)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, color),
-            shape = MaterialTheme.shapes.extraSmall
-        ) {
-            Text("RETURN TO SESSION INDEX", color = color, fontFamily = FontFamily.Monospace)
-        }
+            color = color,
+            fillWidth = true,
+            useBrackets = true
+        )
     }
 }
 
@@ -437,19 +439,16 @@ fun HelpLayout(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(
+        TerminalButton(
+            text = "RETURN TO SESSION INDEX",
             onClick = {
                 viewModel.playClick()
                 viewModel.setMenuScreen(MenuSubScreen.MAIN)
             },
-            colors = ButtonDefaults.buttonColors(containerColor = color.copy(alpha = 0.1f)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(1.dp, color),
-            shape = MaterialTheme.shapes.extraSmall
-        ) {
-            Text("RETURN TO SESSION INDEX", color = color, fontFamily = FontFamily.Monospace)
-        }
+            color = color,
+            fillWidth = true,
+            useBrackets = true
+        )
     }
 }
 
