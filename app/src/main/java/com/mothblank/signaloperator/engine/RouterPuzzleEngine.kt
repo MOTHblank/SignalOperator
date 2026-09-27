@@ -52,6 +52,38 @@ object RouterPuzzleEngine {
         )
     }
 
+    fun connectedNeighborCount(game: RouterGameState, x: Int, y: Int): Int {
+        val tile = game.grid.firstOrNull { it.x == x && it.y == y } ?: return 0
+        var connected = 0
+
+        ports(tile).forEach { port ->
+            val nextX = x + when (port) {
+                EAST -> 1
+                WEST -> -1
+                else -> 0
+            }
+            val nextY = y + when (port) {
+                SOUTH -> 1
+                NORTH -> -1
+                else -> 0
+            }
+
+            if (nextX !in 0 until game.size || nextY !in 0 until game.size) {
+                val connectsEntry = x == 0 && y == game.entryY && port == WEST
+                val connectsExit = x == game.size - 1 && y == game.exitY && port == EAST
+                if (connectsEntry || connectsExit) connected += 1
+                return@forEach
+            }
+
+            val neighbor = game.grid.firstOrNull { it.x == nextX && it.y == nextY }
+                ?: return@forEach
+            val opposite = (port + 2) % 4
+            if (opposite in ports(neighbor)) connected += 1
+        }
+
+        return connected
+    }
+
     fun isConnected(game: RouterGameState): Boolean {
         val size = game.size
         val gridMap = game.grid.associateBy { it.x to it.y }
