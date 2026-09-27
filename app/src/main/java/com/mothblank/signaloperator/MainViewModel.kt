@@ -104,9 +104,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
     val logs: StateFlow<List<LogEntry>> = _logs.asStateFlow()
 
-    private val _isMapViewActive = MutableStateFlow(false)
-    val isMapViewActive: StateFlow<Boolean> = _isMapViewActive.asStateFlow()
-
     private val _activeDialogue = MutableStateFlow<List<DialogueLine>?>(null)
     val activeDialogue: StateFlow<List<DialogueLine>?> = _activeDialogue.asStateFlow()
 
@@ -150,7 +147,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 downloadProgress = 0f
             )
             _logs.value = saved.logs
-            _isMapViewActive.value = false
             generateHotspots(saved.gameState.phase, saved.gameState.seed)
         } else {
             initializeWorld()
@@ -319,7 +315,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _frequency.value = 88f
         _gain.value = 50
         _filter.value = 50
-        _isMapViewActive.value = false
 
         _gameState.value = GameState(
             isInMenu = true,
@@ -358,7 +353,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initializeWorld()
         generateHotspots(GamePhase.APTITUDE_TEST, _gameState.value.seed)
 
-        _isMapViewActive.value = false
         _activeSignal.value = null
         lockedHotspot = null
         activeSignalFrequency = null
@@ -396,7 +390,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             downloadProgress = 0f,
             isMapViewActive = false
         )
-        _isMapViewActive.value = false
         _activeSignal.value = null
         lockedHotspot = null
         activeSignalFrequency = null
@@ -465,8 +458,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleMapView() {
-        _isMapViewActive.value = !_isMapViewActive.value
-        _gameState.value = _gameState.value.copy(isMapViewActive = _isMapViewActive.value)
+        val state = _gameState.value
+        _gameState.value = state.copy(isMapViewActive = !state.isMapViewActive)
     }
 
     fun handleLocationClick(location: Location) {
