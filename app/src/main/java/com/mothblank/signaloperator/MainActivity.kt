@@ -92,7 +92,8 @@ class MainActivity : ComponentActivity() {
                     } else if (gameState.selectedLogEntry != null) {
                         viewModel.selectLogEntry(null)
                     } else if (gameState.activeRouterGame != null) {
-                        viewModel.closeRouterGame()
+                        // Firewall abort is destructive. Require the explicit modal action.
+                        viewModel.playAlert()
                     } else if (gameState.isMapViewActive) {
                         viewModel.toggleMapView()
                     } else {
@@ -177,7 +178,7 @@ class MainActivity : ComponentActivity() {
                                 },
                                 text = {
                                     Column {
-                                        Text("SENDER: ${selectedLog.type.name}", color = currentColor.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
+                                        Text("LOG CLASS: ${selectedLog.type.name}", color = currentColor.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(selectedLog.text, color = currentColor, style = MaterialTheme.typography.bodyMedium)
                                     }
@@ -221,7 +222,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text  = "B.A.R. OPERATOR: 814 // PHASE: ${gameState.phase.name}", 
+                                    text = "B.A.R. OPERATOR: 814 // PHASE: ${gameState.phase.name.replace('_', ' ')}", 
                                     color = currentColor.copy(alpha = 0.7f), 
                                     style = MaterialTheme.typography.labelMedium
                                 )
@@ -238,8 +239,21 @@ class MainActivity : ComponentActivity() {
                             }
                             
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(onClick = { viewModel.toggleMapView() }) {
-                                    Icon(Icons.Default.Place, "Map", tint = if (gameState.isMapViewActive) Color.White else currentColor)
+                                TextButton(
+                                    onClick = { viewModel.toggleMapView() },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Place,
+                                        contentDescription = "Sector Network",
+                                        tint = if (gameState.isMapViewActive) Color.White else currentColor
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        if (gameState.isMapViewActive) "RADIO" else "MAP",
+                                        color = if (gameState.isMapViewActive) Color.White else currentColor,
+                                        style = MaterialTheme.typography.labelMedium
+                                    )
                                 }
                             }
                         }
