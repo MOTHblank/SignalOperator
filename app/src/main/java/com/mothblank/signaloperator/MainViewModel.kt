@@ -13,6 +13,7 @@ import com.mothblank.signaloperator.engine.DialogueCue
 import com.mothblank.signaloperator.engine.GameSessionReducer
 import com.mothblank.signaloperator.engine.HotspotPlanner
 import com.mothblank.signaloperator.engine.ProceduralSignalEngine
+import com.mothblank.signaloperator.engine.RouterPuzzleEngine
 import com.mothblank.signaloperator.engine.SaveStateManager
 import com.mothblank.signaloperator.engine.SignalRequest
 import com.mothblank.signaloperator.models.*
@@ -893,29 +894,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var routerCountdownJob: Job? = null
 
     fun startRouterGame(locationId: String) {
-        val size = 3
-        val random = Random(System.currentTimeMillis())
-        val tiles = mutableListOf<RouterTile>()
-        val tilePaths = listOf(TilePath.STRAIGHT, TilePath.CORNER, TilePath.CROSS)
-        val rotations = listOf(0, 90, 180, 270)
-        for (x in 0 until size) {
-            for (y in 0 until size) {
-                tiles.add(RouterTile(
-                    x = x,
-                    y = y,
-                    type = tilePaths.random(random),
-                    rotationDegrees = rotations.random(random)
-                ))
-            }
-        }
-        
-        val routerState = RouterGameState(
+        if (!isRuntimeActive()) return
+
+        val routerState = RouterPuzzleEngine.create(
             locationId = locationId,
-            grid = tiles,
-            size = size,
-            entryY = 1,
-            exitY = 1,
-            timeLeftSeconds = 15
+            seed = System.currentTimeMillis()
         )
         _gameState.value = _gameState.value.copy(activeRouterGame = routerState)
         soundManager.triggerHaptic("ALARM")
@@ -932,15 +915,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 delay(1000)
                 if (!isRuntimeActive()) continue
+
                 val current = _gameState.value.activeRouterGame ?: break
                 if (current.timeLeftSeconds <= 1) {
                     failRouterGame()
                     break
-                } else {
-                    _gameState.value = _gameState.value.copy(
-                        activeRouterGame = current.copy(timeLeftSeconds = current.timeLeftSeconds - 1)
-                    )
                 }
+
+                _gameState.value = _gameState.value.copy(
+                    activeRouterGame = current.copy(timeLeftSeconds = current.timeLeftSeconds - 1)
+                )
             }
         }
     }
@@ -950,7 +934,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val game = _gameState.value.activeRouterGame ?: return
         addLog("SECURITY BREACH: NODE CONTROL LOST.", LogType.ERROR)
         soundManager.playAlert()
-        
+
         val updatedLocations = _gameState.value.locations.map {
             if (it.id == game.locationId) {
                 it.copy(status = LocationStatus.CORRUPTED)
@@ -958,7 +942,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 it
             }
         }
-        
+
         _gameState.value = _gameState.value.copy(
             locations = updatedLocations,
             activeRouterGame = null
@@ -968,19 +952,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun rotateRouterTile(x: Int, y: Int) {
         val game = _gameState.value.activeRouterGame ?: return
-        val updatedGrid = game.grid.map {
-            if (it.x == x && it.y == y) {
-                it.copy(rotationDegrees = (it.rotationDegrees + 90) % 360)
-            } else {
-                it
-            }
-        }
-        
+        val nextState = RouterPuzzleEngine.rotate(game, x, y)
+
         soundManager.triggerHaptic("SCAN_NOTCH")
-        val nextState = game.copy(grid = updatedGrid)
         _gameState.value = _gameState.value.copy(activeRouterGame = nextState)
-        
-        if (checkPathConnectivity(nextState)) {
+
+        if (RouterPuzzleEngine.isConnected(nextState)) {
             solveRouterGame()
         }
     }
@@ -990,7 +967,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val game = _gameState.value.activeRouterGame ?: return
         addLog("FIREWALL SYNC SUCCESSFUL. NODE SECURED.", LogType.ACTION)
         soundManager.triggerHaptic("BUTTON_CLICK")
-        
+
         val updatedLocations = _gameState.value.locations.map {
             if (it.id == game.locationId) {
                 it.copy(status = LocationStatus.SECURE)
@@ -998,7 +975,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 it
             }
         }
-        
+
         _gameState.value = _gameState.value.copy(
             locations = updatedLocations,
             activeRouterGame = null
@@ -1008,76 +985,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeRouterGame() {
         failRouterGame()
-    }
-
-    private fun getTilePorts(tile: RouterTile): Set<Int> {
-        val rotFactor = (tile.rotationDegrees / 90) % 4
-        return when (tile.type) {
-            TilePath.STRAIGHT -> {
-                if (rotFactor % 2 == 0) {
-                    setOf(1, 3) // RIGHT, LEFT
-                } else {
-                    setOf(0, 2) // UP, DOWN
-                }
-            }
-            TilePath.CORNER -> {
-                val base = setOf(1, 2)
-                base.map { (it + rotFactor) % 4 }.toSet()
-            }
-            TilePath.CROSS -> {
-                setOf(0, 1, 2, 3) // UP, RIGHT, DOWN, LEFT
-            }
-        }
-    }
-
-    private fun checkPathConnectivity(game: RouterGameState): Boolean {
-        val size = game.size
-        val gridMap = game.grid.associateBy { Pair(it.x, it.y) }
-        val visited = mutableSetOf<Pair<Int, Int>>()
-        
-        fun dfs(x: Int, y: Int, fromDir: Int): Boolean {
-            if (x == size && y == game.exitY && fromDir == 3) {
-                return true
-            }
-            if (x !in 0 until size || y !in 0 until size) {
-                return false
-            }
-            if (visited.contains(Pair(x, y))) {
-                return false
-            }
-            
-            val tile = gridMap[Pair(x, y)] ?: return false
-            val ports = getTilePorts(tile)
-            
-            if (!ports.contains(fromDir)) {
-                return false
-            }
-            
-            visited.add(Pair(x, y))
-            
-            for (port in ports) {
-                if (port == fromDir) continue
-                val nextX = x + when (port) {
-                    1 -> 1
-                    3 -> -1
-                    else -> 0
-                }
-                val nextY = y + when (port) {
-                    2 -> 1
-                    0 -> -1
-                    else -> 0
-                }
-                val nextFromDir = (port + 2) % 4
-                if (dfs(nextX, nextY, nextFromDir)) {
-                    return true
-                }
-            }
-            
-            visited.remove(Pair(x, y))
-            return false
-        }
-        
-        return dfs(0, game.entryY, 3)
     }
 
     fun triggerDialogue(lines: List<DialogueLine>) {
