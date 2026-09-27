@@ -153,7 +153,15 @@ object GameSessionReducer {
                 (100 - state.containmentIntegrity) / 80f
             ).coerceIn(0f, 3f)
 
-        state = state.copy(corruptionLevel = max(state.corruptionLevel, systemicCorruption))
+        val phaseFloor = when (state.phase) {
+            GamePhase.ACTIVE_INVESTIGATION -> 1f
+            GamePhase.THE_INTERVIEW -> 2f
+            GamePhase.ENDING_COMPLIANCE,
+            GamePhase.ENDING_SEVERED,
+            GamePhase.ENDING_CONTAINMENT -> 0f
+            else -> 0f
+        }
+        state = state.copy(corruptionLevel = max(phaseFloor, systemicCorruption))
 
         return SessionResolution(
             state = state,
