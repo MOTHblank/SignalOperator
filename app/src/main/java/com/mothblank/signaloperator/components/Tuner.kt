@@ -1,5 +1,10 @@
 package com.mothblank.signaloperator.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
@@ -33,6 +39,7 @@ fun FrequencyTuner(
     setFrequency: (Float) -> Unit,
     proximity: Float,
     knownFrequencies: List<KnownFrequency>,
+    isLocked: Boolean,
     color: Color,
     modifier: Modifier = Modifier,
     onShowHint: (() -> Unit)? = null
@@ -42,6 +49,23 @@ fun FrequencyTuner(
             this.textSize = 22f
             this.isFakeBoldText = true
             this.textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
+    val visualFrequency by animateFloatAsState(
+        targetValue = frequency,
+        animationSpec = spring(
+            dampingRatio = 0.78f,
+            stiffness = Spring.StiffnessHigh
+        ),
+        label = "mechanical-frequency-needle"
+    )
+    val lockPulse = remember { Animatable(1f) }
+
+    LaunchedEffect(isLocked) {
+        if (isLocked) {
+            lockPulse.snapTo(1f)
+            lockPulse.animateTo(1.55f, tween(80))
+            lockPulse.animateTo(1f, tween(170))
         }
     }
 
@@ -83,13 +107,21 @@ fun FrequencyTuner(
             
             // Tuning LED indicator
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("LOCK SIGNAL:", color = color.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
+                Text(
+                    if (isLocked) "LOCKED:" else "LOCK SIGNAL:",
+                    color = color.copy(alpha = if (isLocked) 0.95f else 0.6f),
+                    style = MaterialTheme.typography.labelSmall
+                )
                 Spacer(modifier = Modifier.width(6.dp))
                 Box(
                     modifier = Modifier
                         .size(10.dp)
+                        .graphicsLayer {
+                            scaleX = lockPulse.value
+                            scaleY = lockPulse.value
+                        }
                         .background(
-                            color = if (proximity > 0.05f) color.copy(alpha = 0.2f + proximity * 0.8f) else color.copy(alpha = 0.1f),
+                            color = if (isLocked) color else if (proximity > 0.05f) color.copy(alpha = 0.2f + proximity * 0.8f) else color.copy(alpha = 0.1f),
                             shape = CircleShape
                         )
                         .border(
@@ -98,7 +130,7 @@ fun FrequencyTuner(
                             shape = CircleShape
                         )
                 ) {
-                    if (proximity > 0.5f) {
+                    if (isLocked || proximity > 0.5f) {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -197,7 +229,7 @@ fun FrequencyTuner(
             }
 
             // Draw cursor line for the active frequency
-            val cursorX = ((frequency - 88f) / range) * width
+            val cursorX = ((visualFrequency - 88f) / range) * width
             drawLine(
                 color = Color.Red,
                 start = Offset(cursorX, 0f),
