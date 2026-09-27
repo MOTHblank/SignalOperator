@@ -25,7 +25,7 @@ fun HelpOverlay(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .wrapContentHeight()
+                .fillMaxHeight(0.82f)
                 .border(1.dp, color),
             color = Color.Black
         ) {
