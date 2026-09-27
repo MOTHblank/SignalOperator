@@ -3,6 +3,7 @@ package com.mothblank.signaloperator.engine
 import com.mothblank.signaloperator.models.GamePhase
 import com.mothblank.signaloperator.models.PuzzleType
 import com.mothblank.signaloperator.models.SignalKind
+import com.mothblank.signaloperator.models.PuzzleInteraction
 import com.mothblank.signaloperator.models.GameState
 import com.mothblank.signaloperator.models.Location
 import com.mothblank.signaloperator.models.Character
@@ -154,6 +155,52 @@ class ProceduralSignalEngineTest {
         assertEquals(SignalKind.DEAD_DROP, signal.kind)
         assertNotNull(signal.outcome)
         assertTrue(signal.outcome!!.commitEffects.any { it.type.name == "ADD_SECURITY_CHARGES" })
+    }
+
+    @Test
+    fun specialSignalKindsExposeTypedInteractions() {
+        val systemData = SystemData(
+            batteryLevel = 67,
+            deviceModel = "TEST-DEVICE",
+            currentTime = "12:34:56"
+        )
+
+        val deadDrop = engine.generateSignal(
+            SignalRequest(
+                phase = GamePhase.ACTIVE_INVESTIGATION,
+                frequency = 97.1f,
+                seed = 23L,
+                systemData = systemData,
+                requestedKind = SignalKind.DEAD_DROP
+            )
+        )
+        assertTrue(
+            deadDrop.interaction == PuzzleInteraction.DEAD_DROP_ACK ||
+                deadDrop.interaction == PuzzleInteraction.DEAD_DROP_BATTERY
+        )
+
+        val mundane = engine.generateSignal(
+            SignalRequest(
+                phase = GamePhase.LIVE_INTRUSION,
+                frequency = 99.3f,
+                seed = 814L,
+                systemData = systemData,
+                requestedKind = SignalKind.MUNDANE_BROADCAST
+            )
+        )
+        assertEquals(PuzzleInteraction.MUNDANE_DISCARD, mundane.interaction)
+
+        val interview = engine.generateSignal(
+            SignalRequest(
+                phase = GamePhase.THE_INTERVIEW,
+                frequency = 101.7f,
+                seed = 814L,
+                systemData = systemData,
+                solvedPuzzlesCount = 1,
+                requestedKind = SignalKind.MISSION
+            )
+        )
+        assertEquals(PuzzleInteraction.INTERVIEW_CHOICE, interview.interaction)
     }
 
 }
