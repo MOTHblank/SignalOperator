@@ -80,4 +80,33 @@ class RouterPuzzleEngineTest {
             assertTrue("seed=$seed should have solved topology", RouterPuzzleEngine.isConnected(solved))
         }
     }
+    @Test
+    fun energizedTilesFollowOnlyMutuallyConnectedPathFromEntry() {
+        val game = RouterGameState(
+            locationId = "loc",
+            grid = listOf(
+                RouterTile(0, 0, TilePath.STRAIGHT, 90),
+                RouterTile(1, 0, TilePath.STRAIGHT, 0),
+                RouterTile(2, 0, TilePath.STRAIGHT, 0),
+                RouterTile(0, 1, TilePath.STRAIGHT, 0),
+                RouterTile(1, 1, TilePath.CORNER, 0),
+                RouterTile(2, 1, TilePath.STRAIGHT, 90),
+                RouterTile(0, 2, TilePath.STRAIGHT, 0),
+                RouterTile(1, 2, TilePath.STRAIGHT, 0),
+                RouterTile(2, 2, TilePath.STRAIGHT, 0)
+            ),
+            size = 3,
+            entryY = 1,
+            exitY = 1,
+            timeLeftSeconds = 15
+        )
+
+        val energized = RouterPuzzleEngine.energizedTiles(game)
+
+        assertTrue(0 to 1 in energized)
+        assertTrue(1 to 1 in energized)
+        assertFalse(2 to 1 in energized)
+        assertFalse(1 to 0 in energized)
+    }
+
 }
