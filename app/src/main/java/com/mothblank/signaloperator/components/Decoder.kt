@@ -316,9 +316,16 @@ fun Decoder(
                             color = color.copy(alpha = 0.82f),
                             style = MaterialTheme.typography.bodySmall
                         )
-                        outcome.locationId?.let {
+                        outcome.locationId?.let { locationId ->
+                            val locationName = when (locationId) {
+                                "loc-1" -> "SITE ALPHA"
+                                "loc-2" -> "SECTOR 4 RELAY"
+                                "loc-3" -> "ALPHA OUTPOST"
+                                "loc-4" -> "EXCLUSION ZONE"
+                                else -> "UNKNOWN NODE"
+                            }
                             Text(
-                                "NETWORK TARGET: $it",
+                                "NETWORK TARGET: $locationName",
                                 color = color.copy(alpha = 0.6f),
                                 style = MaterialTheme.typography.labelSmall
                             )
