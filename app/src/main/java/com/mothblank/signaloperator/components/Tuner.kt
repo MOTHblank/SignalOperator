@@ -228,9 +228,18 @@ fun StabilizerTuner(
     isLocked: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    Row(modifier = modifier.fillMaxWidth()) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (!isLocked) {
+            Text(
+                "GAIN / FILTER OFFLINE // ACQUIRE A CARRIER FIRST",
+                color = color.copy(alpha = 0.45f),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(bottom = 2.dp)
+            )
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-            Text("GAIN: $gain", color = color, style = MaterialTheme.typography.labelSmall)
+            Text("GAIN: $gain", color = if (isLocked) color else color.copy(alpha = 0.45f), style = MaterialTheme.typography.labelSmall)
             Slider(
                 value = gain.toFloat(),
                 onValueChange = { setGain(it.toInt()) },
@@ -240,7 +249,7 @@ fun StabilizerTuner(
             )
         }
         Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-            Text("FILTER: $filter", color = color, style = MaterialTheme.typography.labelSmall)
+            Text("FILTER: $filter", color = if (isLocked) color else color.copy(alpha = 0.45f), style = MaterialTheme.typography.labelSmall)
             Slider(
                 value = filter.toFloat(),
                 onValueChange = { setFilter(it.toInt()) },
@@ -248,6 +257,7 @@ fun StabilizerTuner(
                 enabled = isLocked,
                 colors = SliderDefaults.colors(thumbColor = color, activeTrackColor = color)
             )
+        }
         }
     }
 }
