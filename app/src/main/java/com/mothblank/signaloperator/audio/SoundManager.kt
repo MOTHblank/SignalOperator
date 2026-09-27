@@ -37,6 +37,7 @@ class SoundManager(private val context: Context) {
 
     private var clickSoundId = -1
     private var alertSoundId = -1
+    @Volatile private var effectsEnabled = true
 
     private data class AudioParameters(
         val staticVolume: Float = 0.5f,
@@ -425,22 +426,26 @@ class SoundManager(private val context: Context) {
         }
     }
 
+    fun setEffectsEnabled(enabled: Boolean) {
+        effectsEnabled = enabled
+    }
+
     fun playClick() {
         triggerHaptic("BUTTON_CLICK")
-        if (clickSoundId != -1) {
+        if (effectsEnabled && clickSoundId != -1) {
             soundPool.play(clickSoundId, 0.4f, 0.4f, 1, 0, 1.0f)
         }
     }
 
     fun playTypewriterTick() {
-        if (clickSoundId != -1) {
+        if (effectsEnabled && clickSoundId != -1) {
             soundPool.play(clickSoundId, 0.08f, 0.08f, 0, 0, 1.35f)
         }
     }
 
     fun playAlert() {
         triggerHaptic("ALARM")
-        if (alertSoundId != -1) {
+        if (effectsEnabled && alertSoundId != -1) {
             soundPool.play(alertSoundId, 0.35f, 0.35f, 1, 0, 1.0f)
         }
     }
