@@ -22,6 +22,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.focusable
+import com.mothblank.signaloperator.BuildConfig
 import com.mothblank.signaloperator.MainViewModel
 import com.mothblank.signaloperator.models.GameState
 import com.mothblank.signaloperator.models.MenuSubScreen
@@ -133,7 +134,7 @@ fun MainMenuLayout(
         )
 
         Text(
-            text = "SECURITY SESSION TERMINAL ACCESS v2.8",
+            text = "SECURITY SESSION TERMINAL ACCESS v${BuildConfig.VERSION_NAME}",
             color = color.copy(alpha = 0.6f),
             fontFamily = FontFamily.Monospace,
             fontSize = 11.sp,
@@ -644,76 +645,3 @@ fun TerminalToggleOption(
     }
 }
 
-@Composable
-fun EndingShutdownScreen(
-    gameState: GameState,
-    onBackToMenu: () -> Unit,
-    color: Color
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-            .padding(24.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        val title = when (gameState.phase) {
-            com.mothblank.signaloperator.models.GamePhase.ENDING_COMPLIANCE -> "=== COGNITIVE INTEGRATION SUCCESSFUL ==="
-            com.mothblank.signaloperator.models.GamePhase.ENDING_SEVERED -> "=== SESSION TERMINATED BY CLIENT ==="
-            else -> "=== CRITICAL SECURITY LEAK DETECTED ==="
-        }
-        
-        Text(
-            text = title,
-            color = color,
-            fontFamily = FontFamily.Monospace,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
-        
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .border(1.dp, color)
-                .padding(20.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("OPERATOR ID: OP-${gameState.seed % 1000}", color = color, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
-                Text("PHASE: ${gameState.phase.name}", color = color, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
-                Text("INTEL FILES ARCHIVED: ${gameState.archivedSignals}", color = color, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
-                Text("INTERCEPTS DISCARDED: ${gameState.ignoredSignals}", color = color, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
-                
-                val finalScore = (gameState.archivedSignals * 1000 - gameState.ignoredSignals * 200).coerceAtLeast(0)
-                Text("FINAL COGNITIVE SCORE: $finalScore PTS", color = color, fontFamily = FontFamily.Monospace, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        val blinkTransition = rememberInfiniteTransition(label = "ending_blink")
-        val blinkAlpha by blinkTransition.animateFloat(
-            initialValue = 0.3f,
-            targetValue = 1.0f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(800, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "ending_alpha"
-        )
-        
-        Text(
-            text = "> PRESS HERE TO RETURN TO INDEX <",
-            color = color.copy(alpha = blinkAlpha),
-            fontFamily = FontFamily.Monospace,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .clickable { onBackToMenu() }
-                .padding(12.dp)
-        )
-    }
-}
