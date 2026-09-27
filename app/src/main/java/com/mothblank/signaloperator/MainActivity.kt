@@ -195,6 +195,10 @@ class MainActivity : ComponentActivity() {
                             gameState.phase == GamePhase.ENDING_CONTAINMENT) {
                             EndingScreen(
                                 phase = gameState.phase,
+                                endingSummary = gameState.endingSummary,
+                                containmentIntegrity = gameState.containmentIntegrity,
+                                exposure = gameState.exposure,
+                                trustInEcho = gameState.trustInEcho,
                                 color = currentColor,
                                 onRestart = { viewModel.returnToMenu() }
                             )
@@ -275,11 +279,16 @@ class MainActivity : ComponentActivity() {
                         ) {
                             if (gameState.isMapViewActive) {
                                 SectorMap(
-                                    locations  = gameState.locations,
+                                    locations = gameState.locations,
                                     characters = gameState.characters,
-                                    color      = currentColor,
+                                    networkLinks = gameState.networkLinks,
+                                    securityCharges = gameState.securityCharges,
+                                    containmentIntegrity = gameState.containmentIntegrity,
+                                    exposure = gameState.exposure,
+                                    trustInEcho = gameState.trustInEcho,
+                                    color = currentColor,
                                     onLocationClick = { viewModel.handleLocationClick(it) },
-                                    modifier   = Modifier.fillMaxSize()
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             } else {
                                 Column(
@@ -350,6 +359,10 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun EndingScreen(
     phase: GamePhase,
+    endingSummary: String?,
+    containmentIntegrity: Int,
+    exposure: Int,
+    trustInEcho: Int,
     color: Color,
     onRestart: () -> Unit,
     modifier: Modifier = Modifier
@@ -403,6 +416,24 @@ fun EndingScreen(
                 .border(1.dp, color.copy(alpha = 0.5f))
                 .padding(16.dp)
                 .fillMaxWidth()
+        )
+        if (!endingSummary.isNullOrBlank()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "RUN CONSEQUENCE > $endingSummary",
+                color = color,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .border(1.dp, color.copy(alpha = 0.35f))
+                    .padding(12.dp)
+                    .fillMaxWidth()
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "FINAL NETWORK // CONTAINMENT $containmentIntegrity% // EXPOSURE $exposure% // ECHO TRUST $trustInEcho%",
+            color = color.copy(alpha = 0.65f),
+            style = MaterialTheme.typography.labelSmall
         )
         Spacer(modifier = Modifier.height(32.dp))
         Button(
