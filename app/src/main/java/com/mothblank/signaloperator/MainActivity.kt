@@ -282,6 +282,7 @@ class MainActivity : ComponentActivity() {
                             setFrequency = { viewModel.setFrequency(it) },
                             proximity = proximity,
                             knownFrequencies = gameState.knownFrequencies,
+                            isLocked = activeSignal != null,
                             color = currentColor,
                             onShowHint   = {
                                 activeHint = Pair(
