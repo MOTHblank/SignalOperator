@@ -127,14 +127,14 @@ fun Visualizer(
         val liveFreq = if (activeSignal != null) filter * 0.004f + 0.05f else 0.2f
         val noiseLevel = if (activeSignal != null) ((100f - stability) / 100f) * 15f else (1.0f - proximity) * 20f
 
+        val signalPhase = (activeSignal?.id?.hashCode() ?: 0) * 0.0001f
         for (i in 0..points) {
             val x = i * step
             // Add secondary harmonic to simulate complex analog signals and static
             val fundamental = sin(i * liveFreq + time * 10f) * 0.8f
             val harmonic = sin(i * liveFreq * 2.2f + time * 16f) * 0.2f
             val wave = (fundamental + harmonic) * liveAmp
-            
-            val signalPhase = (activeSignal?.id?.hashCode() ?: 0) * 0.0001f
+
             val noise =
                 (sin(i * 12.9898f + time * 19.7f + signalPhase) * 0.65f +
                     sin(i * 3.117f - time * 11.3f + signalPhase * 2f) * 0.35f) *
