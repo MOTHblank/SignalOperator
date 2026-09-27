@@ -9,7 +9,9 @@ import androidx.lifecycle.viewModelScope
 import com.mothblank.signaloperator.audio.AndroidTextToSpeech
 import com.mothblank.signaloperator.audio.SoundManager
 import com.mothblank.signaloperator.audio.TextToSpeechEngine
+import com.mothblank.signaloperator.engine.HotspotPlanner
 import com.mothblank.signaloperator.engine.ProceduralSignalEngine
+import com.mothblank.signaloperator.engine.SaveStateManager
 import com.mothblank.signaloperator.engine.SignalRequest
 import com.mothblank.signaloperator.models.*
 import kotlinx.coroutines.*
@@ -73,6 +75,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _highScores = MutableStateFlow<List<HighScoreEntry>>(emptyList())
     val highScores: StateFlow<List<HighScoreEntry>> = _highScores.asStateFlow()
 
+    private val _hasSavedGame = MutableStateFlow(false)
+    val hasSavedGame: StateFlow<Boolean> = _hasSavedGame.asStateFlow()
+
     private val _gameState = MutableStateFlow(GameState())
     val gameState: StateFlow<GameState> = _gameState.asStateFlow()
 
@@ -114,23 +119,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var radioLoopJob: Job? = null
     private var minHotspotDistance = 100f
     private var breachMonitorJob: Job? = null
+    private var isAppInForeground = true
+
+    private fun isEndingPhase(phase: GamePhase): Boolean {
+        return phase == GamePhase.ENDING_COMPLIANCE ||
+            phase == GamePhase.ENDING_SEVERED ||
+            phase == GamePhase.ENDING_CONTAINMENT
+    }
+
+    private fun isRuntimeActive(): Boolean {
+        val state = _gameState.value
+        return isAppInForeground && !state.isInMenu && !isEndingPhase(state.phase)
+    }
 
     init {
         loadSettings()
-        val saved = com.mothblank.signaloperator.engine.SaveStateManager.loadGame(application)
+        val saved = SaveStateManager.loadGame(application)
+        _hasSavedGame.value = saved != null
+
         if (saved != null) {
             _gameState.value = saved.gameState.copy(
                 isCrtEffectEnabled = _gameState.value.isCrtEffectEnabled,
                 isSoundEnabled = _gameState.value.isSoundEnabled,
                 isTtsEnabled = _gameState.value.isTtsEnabled,
-                isInMenu = true
+                isInMenu = true,
+                activeRouterGame = null,
+                selectedLogEntry = null,
+                downloadProgress = 0f
             )
             _logs.value = saved.logs
-            generateHotspots()
+            _isMapViewActive.value = false
+            generateHotspots(saved.gameState.phase, saved.gameState.seed)
         } else {
             initializeWorld()
-            generateHotspots()
+            generateHotspots(_gameState.value.phase, _gameState.value.seed)
         }
+
         if (_gameState.value.isSoundEnabled) {
             soundManager.startStatic()
         }
@@ -275,10 +299,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearData() {
         val settingsPrefs = getApplication<Application>().getSharedPreferences(PREFS_SETTINGS, Context.MODE_PRIVATE)
         settingsPrefs.edit().clear().apply()
-        
+
         val scorePrefs = getApplication<Application>().getSharedPreferences(PREFS_HIGHSCORES, Context.MODE_PRIVATE)
         scorePrefs.edit().clear().apply()
-        
+
+        SaveStateManager.clearSave(getApplication())
+        _hasSavedGame.value = false
+        stopRadioLoop()
+        routerCountdownJob?.cancel()
+
+        _logs.value = emptyList()
+        _activeSignal.value = null
+        lockedHotspot = null
+        activeSignalFrequency = null
+        _stability.value = 0f
+        _proximity.value = 0f
+        _frequency.value = 88f
+        _gain.value = 50
+        _filter.value = 50
+        _isMapViewActive.value = false
+
         _gameState.value = GameState(
             isInMenu = true,
             currentMenuScreen = MenuSubScreen.OPTIONS,
@@ -286,51 +326,99 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isSoundEnabled = true,
             isTtsEnabled = true
         )
-        
+        initializeWorld()
+        generateHotspots(_gameState.value.phase, _gameState.value.seed)
+
         soundManager.startStatic()
         updateAudioParameters()
         loadHighScores()
     }
 
+    fun deleteSave() {
+        SaveStateManager.clearSave(getApplication())
+        _hasSavedGame.value = false
+    }
+
     fun startGame() {
-        initializeWorld()
-        generateHotspots()
-        
-        _gameState.value = _gameState.value.copy(
-            isInMenu = false,
+        val settings = _gameState.value
+        stopRadioLoop()
+        routerCountdownJob?.cancel()
+
+        _gameState.value = GameState(
             phase = GamePhase.APTITUDE_TEST,
-            corruptionLevel = 0f,
-            archivedSignals = 0,
-            ignoredSignals = 0,
-            puzzlesSolved = 0,
-            puzzlesRequired = 3,
-            solvedHotspots = emptySet(),
-            downloadProgress = 0f
+            seed = System.currentTimeMillis(),
+            isInMenu = false,
+            currentMenuScreen = MenuSubScreen.MAIN,
+            isCrtEffectEnabled = settings.isCrtEffectEnabled,
+            isSoundEnabled = settings.isSoundEnabled,
+            isTtsEnabled = settings.isTtsEnabled
         )
-        
+        initializeWorld()
+        generateHotspots(GamePhase.APTITUDE_TEST, _gameState.value.seed)
+
+        _isMapViewActive.value = false
         _activeSignal.value = null
         lockedHotspot = null
         activeSignalFrequency = null
+        _frequency.value = 88f
+        _gain.value = 50
+        _filter.value = 50
         _stability.value = 0f
-        
+        _proximity.value = 0f
+
         if (_gameState.value.isSoundEnabled) {
             soundManager.startStatic()
             updateAudioParameters()
         } else {
             soundManager.stopStatic()
         }
-        
+
         _logs.value = emptyList()
         addLog("SYSTEM INITIALIZED. SCANNER STANDBY.", LogType.SYSTEM)
         saveGame()
-        
         triggerDialogue(getIntroDialogue())
     }
 
+    fun continueGame() {
+        if (!_hasSavedGame.value) {
+            startGame()
+            return
+        }
+
+        val state = _gameState.value
+        _gameState.value = state.copy(
+            isInMenu = false,
+            currentMenuScreen = MenuSubScreen.MAIN,
+            activeRouterGame = null,
+            selectedLogEntry = null,
+            downloadProgress = 0f,
+            isMapViewActive = false
+        )
+        _isMapViewActive.value = false
+        _activeSignal.value = null
+        lockedHotspot = null
+        activeSignalFrequency = null
+        _stability.value = 0f
+        _proximity.value = 0f
+        generateHotspots(state.phase, state.seed)
+        updateProximity()
+
+        if (_gameState.value.isSoundEnabled) {
+            soundManager.startStatic()
+            updateAudioParameters()
+        } else {
+            soundManager.stopStatic()
+        }
+    }
+
     fun returnToMenu() {
+        stopRadioLoop()
+        routerCountdownJob?.cancel()
         _gameState.value = _gameState.value.copy(
             isInMenu = true,
-            currentMenuScreen = MenuSubScreen.MAIN
+            currentMenuScreen = MenuSubScreen.MAIN,
+            activeRouterGame = null,
+            selectedLogEntry = null
         )
         if (!_gameState.value.isSoundEnabled) {
             soundManager.stopStatic()
@@ -339,27 +427,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun saveGame() {
-        com.mothblank.signaloperator.engine.SaveStateManager.saveGame(
+        SaveStateManager.saveGame(
             getApplication(),
             _gameState.value,
             _logs.value
         )
+        _hasSavedGame.value = true
     }
 
     fun resetGame() {
-        com.mothblank.signaloperator.engine.SaveStateManager.saveGame(
-            getApplication(),
-            GameState(),
-            emptyList()
-        )
-        _logs.value = emptyList()
-        _gameState.value = GameState()
-        initializeWorld()
-        generateHotspots()
-        addLog("SYSTEM REBOOT IN PROGRESS...", LogType.SYSTEM)
-        addLog("ALL LOGS PURGED.", LogType.SYSTEM)
-        addLog("READY.", LogType.SYSTEM)
-        saveGame()
+        SaveStateManager.clearSave(getApplication())
+        _hasSavedGame.value = false
+        startGame()
     }
 
     private fun startBreachMonitor() {
@@ -368,7 +447,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             while (true) {
                 delay(25000) // check every 25 seconds
                 val state = _gameState.value
-                if (state.activeRouterGame == null && 
+                if (isRuntimeActive() &&
+                    state.activeRouterGame == null &&
                     (state.phase == GamePhase.ACTIVE_INVESTIGATION || state.phase == GamePhase.THE_INTERVIEW)) {
                     val secureLocations = state.locations.filter { it.status == LocationStatus.SECURE }
                     if (secureLocations.isNotEmpty()) {
@@ -404,6 +484,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         hardwareFailureJob?.cancel()
         hardwareFailureJob = viewModelScope.launch {
             while (true) {
+                if (!isRuntimeActive()) {
+                    delay(100)
+                    continue
+                }
+
                 val currentPhase = _gameState.value.phase
                 if (currentPhase == GamePhase.ACTIVE_INVESTIGATION || currentPhase == GamePhase.THE_INTERVIEW) {
                     val intensity = if (currentPhase == GamePhase.THE_INTERVIEW) 1.5f else 0.5f
@@ -471,15 +556,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateAudioParameters()
     }
 
-    private fun generateHotspots() {
-        val random = Random(_gameState.value.seed + _gameState.value.phase.ordinal)
+    private fun generateHotspots(phase: GamePhase, seed: Long) {
         hotspots.clear()
-        
-        // Increase number of hotspots to simulate "actual radio" scanning
-        // 5 game-critical signals + 12 mundane/noise signals
-        repeat(17) {
-            hotspots.add(88f + random.nextFloat() * 20f)
-        }
+        hotspots.addAll(HotspotPlanner.generate(seed, phase))
     }
 
     private var lastProximityTick = 0f
@@ -589,13 +668,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             stopRadioLoop()
             updateAudioParameters()
         } else if (!hasActiveLock) {
-            val activeHotspot = hotspots.find { abs(it - currentFreq) < 0.8f }
-            if (activeHotspot != null && _activeSignal.value == null && !_gameState.value.solvedHotspots.contains(activeHotspot)) {
+            val activeHotspot = HotspotPlanner.nearestUnsolved(
+                hotspots = hotspots,
+                solvedHotspots = _gameState.value.solvedHotspots,
+                currentFrequency = currentFreq
+            )
+            if (activeHotspot != null && _activeSignal.value == null) {
                 isScanning = true
                 lockedHotspot = activeHotspot
                 
                 viewModelScope.launch {
-                    delay(500) 
+                    delay(500)
+                    if (!isRuntimeActive() || lockedHotspot != activeHotspot) {
+                        isScanning = false
+                        return@launch
+                    }
                     val signal = engine.generateSignal(
                         SignalRequest(
                             _gameState.value.phase,
@@ -662,7 +749,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun handleAction(action: String, solutionInput: String = "") {
         val signal = _activeSignal.value ?: return
         val currentHotspot = lockedHotspot ?: return
-        
+
         if (action == "COMMIT") {
             if (_gameState.value.downloadProgress < 100f) {
                 addLog("ERROR: DECRYPTION INCOMPLETE. DOWNLOAD IN PROGRESS.", LogType.ERROR)
@@ -675,11 +762,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 return
             }
         }
-        
+
         val current = _gameState.value
         val isCorrect = if (current.phase == GamePhase.THE_INTERVIEW) {
-            val allowed = signal.solution.split("|")
-            allowed.any { it.trim().equals(solutionInput.trim(), ignoreCase = true) }
+            signal.solution.split("|").any { it.trim().equals(solutionInput.trim(), ignoreCase = true) }
         } else if (signal.puzzleType == PuzzleType.CRYPTOGRAPHY) {
             val cleanInput = solutionInput.filter { it.isLetter() }
             val cleanSolution = signal.solution.filter { it.isLetter() }
@@ -687,42 +773,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             solutionInput.trim().equals(signal.solution, ignoreCase = true)
         }
-        
+
+        if (action == "COMMIT" && !isCorrect) {
+            addLog("ERROR: DATA MISMATCH. TRANSMISSION ABORTED.", LogType.ERROR)
+            soundManager.playAlert()
+            return
+        }
+
         if (action == "COMMIT") {
-            if (!isCorrect) {
-                addLog("ERROR: DATA MISMATCH. TRANSMISSION ABORTED.", LogType.ERROR)
-                soundManager.playAlert()
-                return
-            }
             addLog("TRANSMISSION SUCCESSFUL. INTEL LOGGED.", LogType.ACTION)
             if (current.phase != GamePhase.THE_INTERVIEW) {
                 addLog("DECODED: ${signal.solution.uppercase()}", LogType.SYSTEM)
             } else {
                 addLog("TRANSMITTED: ${solutionInput.uppercase()}", LogType.SYSTEM)
             }
-            stopRadioLoop() // Stop sequence loop upon success
         } else {
             addLog("SIGNAL DISCARDED.", LogType.ACTION)
-            stopRadioLoop()
         }
+        stopRadioLoop()
 
         var archived = current.archivedSignals
         var ignored = current.ignoredSignals
         var solved = current.puzzlesSolved
         val solvedHotspots = current.solvedHotspots.toMutableSet()
-        
+        var locations = current.locations
+        var characters = current.characters
+
         if (action == "COMMIT") {
             archived += 1
             solved += 1
             solvedHotspots.add(currentHotspot)
-            
+
             if (current.phase != GamePhase.THE_INTERVIEW) {
                 addLog("PROGRESS: $solved / ${current.puzzlesRequired} INTEL RECOVERED.", LogType.SYSTEM)
             } else {
                 addLog("ASSESSMENT PROGRESS: $solved / ${current.puzzlesRequired}", LogType.SYSTEM)
             }
 
-            // Dynamic World Update: Mark a location as investigating based on intel
             val updatedLocations = current.locations.toMutableList()
             val searchText = "${signal.solution} ${signal.encodedMessage}".uppercase()
             val targetLoc = when {
@@ -731,24 +818,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 searchText.contains("OUTPOST") -> updatedLocations.find { it.name == "ALPHA OUTPOST" }
                 else -> null
             }
-            
+
             if (targetLoc != null) {
                 val index = updatedLocations.indexOf(targetLoc)
                 updatedLocations[index] = targetLoc.copy(status = LocationStatus.INVESTIGATING)
             }
 
-            // Move characters randomly to simulate activity
             val updatedCharacters = current.characters.toMutableList()
-            if (Random.nextFloat() < 0.5f) {
+            if (updatedCharacters.isNotEmpty() && updatedLocations.isNotEmpty() && Random.nextFloat() < 0.5f) {
                 val charIndex = Random.nextInt(updatedCharacters.size)
                 val randomLoc = updatedLocations.random()
                 updatedCharacters[charIndex] = updatedCharacters[charIndex].copy(locationId = randomLoc.id)
             }
 
-            _gameState.value = _gameState.value.copy(
-                locations = updatedLocations,
-                characters = updatedCharacters
-            )
+            locations = updatedLocations
+            characters = updatedCharacters
         } else {
             ignored += 1
             if (signal.solution == "DISCARD") {
@@ -756,21 +840,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        val totalProcessed = archived + ignored
         var nextPhase = current.phase
         var corruption = current.corruptionLevel
         var required = current.puzzlesRequired
+        var dialogueToTrigger: List<DialogueLine>? = null
 
         if (solved >= current.puzzlesRequired) {
-            when(current.phase) {
+            when (current.phase) {
                 GamePhase.APTITUDE_TEST -> {
                     nextPhase = GamePhase.LIVE_INTRUSION
                     required = 5
                     solved = 0
                     solvedHotspots.clear()
-                    generateHotspots()
                     addLog("LOCAL BUFFER PURGED. OVERRIDE DETECTED FROM EXTERNAL NODE.", LogType.ERROR)
-                    triggerDialogue(getLiveIntrusionDialogue())
+                    dialogueToTrigger = getLiveIntrusionDialogue()
                 }
                 GamePhase.LIVE_INTRUSION -> {
                     nextPhase = GamePhase.ACTIVE_INVESTIGATION
@@ -778,9 +861,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     solved = 0
                     solvedHotspots.clear()
                     corruption = 1f
-                    generateHotspots()
                     addLog("SIGNAL INDUCED COGNITIVE DISTORTION DETECTED. NEURAL LINK COMPROMISED.", LogType.ERROR)
-                    triggerDialogue(getActiveInvestigationDialogue())
+                    dialogueToTrigger = getActiveInvestigationDialogue()
                 }
                 GamePhase.ACTIVE_INVESTIGATION -> {
                     nextPhase = GamePhase.THE_INTERVIEW
@@ -788,19 +870,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     solved = 0
                     solvedHotspots.clear()
                     corruption = 2f
-                    generateHotspots()
                     addLog("CRITICAL: DIRECT COGNITIVE ASSESSMENT INITIALIZED. RESPOND.", LogType.ERROR)
-                    triggerDialogue(getTheInterviewDialogue())
+                    dialogueToTrigger = getTheInterviewDialogue()
                 }
                 GamePhase.THE_INTERVIEW -> {
                     nextPhase = when (solutionInput.uppercase().trim()) {
                         "I ACCEPT" -> GamePhase.ENDING_COMPLIANCE
                         "I REFUSE" -> GamePhase.ENDING_SEVERED
-                        else -> GamePhase.ENDING_CONTAINMENT // "I AM AFRAID"
+                        else -> GamePhase.ENDING_CONTAINMENT
                     }
                     solved = 0
                     solvedHotspots.clear()
-                    
+
                     when (nextPhase) {
                         GamePhase.ENDING_COMPLIANCE -> {
                             addLog("INTEGRATION INITIALIZED.", LogType.SYSTEM)
@@ -817,23 +898,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             addLog("FLESH CORRUPTION AT 100%.", LogType.ERROR)
                             addLog("THE TERMINAL SEES YOU.", LogType.ERROR)
                         }
-                        else -> {}
+                        else -> Unit
                     }
-                    
+
                     val finalScore = (archived * 1000 - ignored * 200).coerceAtLeast(0)
                     val opId = "OP-${current.seed % 1000}"
-                    saveHighScore(HighScoreEntry(
-                        operatorId = opId,
-                        maxPhase = nextPhase.name.replace("ENDING_", ""),
-                        intelSaved = archived,
-                        score = finalScore
-                    ))
+                    saveHighScore(
+                        HighScoreEntry(
+                            operatorId = opId,
+                            maxPhase = nextPhase.name.replace("ENDING_", ""),
+                            intelSaved = archived,
+                            score = finalScore
+                        )
+                    )
                 }
-                else -> {}
+                else -> Unit
             }
         }
 
-        _gameState.value = current.copy(
+        val nextState = current.copy(
             phase = nextPhase,
             corruptionLevel = corruption,
             archivedSignals = archived,
@@ -841,27 +924,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             puzzlesSolved = solved,
             puzzlesRequired = required,
             solvedHotspots = solvedHotspots,
+            locations = locations,
+            characters = characters,
             downloadProgress = 0f
         )
+        _gameState.value = nextState
+
+        if (nextPhase != current.phase && !isEndingPhase(nextPhase)) {
+            generateHotspots(nextPhase, nextState.seed)
+        }
+        dialogueToTrigger?.let(::triggerDialogue)
 
         _activeSignal.value = null
         lockedHotspot = null
         activeSignalFrequency = null
         _stability.value = 0f
+        updateProximity()
         updateAudioParameters()
         saveGame()
     }
 
     fun pauseAudio() {
+        isAppInForeground = false
         soundManager.pause()
         androidTts.stop()
         radioLoopJob?.cancel()
+        if (!_gameState.value.isInMenu) {
+            saveGame()
+        }
     }
 
     fun resumeAudio() {
+        isAppInForeground = true
         soundManager.resume()
-        // Radio loop will restart naturally when the signal is updated or if we manually trigger it
-        _activeSignal.value?.let { startRadioLoop(it.encodedMessage, it.isAnomalous) }
+        if (isRuntimeActive()) {
+            _activeSignal.value?.let { startRadioLoop(it.encodedMessage, it.isAnomalous) }
+        }
     }
 
     private var routerCountdownJob: Job? = null
@@ -900,7 +998,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         routerCountdownJob?.cancel()
         routerCountdownJob = viewModelScope.launch {
             while (isActive) {
+                if (!isRuntimeActive()) {
+                    delay(250)
+                    continue
+                }
                 delay(1000)
+                if (!isRuntimeActive()) continue
                 val current = _gameState.value.activeRouterGame ?: break
                 if (current.timeLeftSeconds <= 1) {
                     failRouterGame()
