@@ -22,7 +22,7 @@ fun DialogueOverlay(
     dialogue: List<DialogueLine>,
     currentIndex: Int,
     color: Color,
-    onPlayClick: () -> Unit,
+    onTypewriterTick: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -37,8 +37,8 @@ fun DialogueOverlay(
         for (i in 1..fullText.length) {
             delay(25) // Typing speed (ms per character)
             visibleTextLength = i
-            if (i % 2 == 1) { // Play typewriter mechanical click on every alternate character
-                onPlayClick()
+            if (i % 4 == 1 && !fullText[i - 1].isWhitespace()) {
+                onTypewriterTick()
             }
         }
     }
@@ -75,12 +75,13 @@ fun DialogueOverlay(
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.72f)
                 .border(2.dp, color)
                 .padding(24.dp)
         ) {
             // Header area: Speaker name and status
             Text(
-                text = "● INCOMING_TRANSMISSION // SOURCE: ${line.speaker.uppercase()}",
+                text = "● INCOMING TRANSMISSION // SOURCE: ${line.speaker.uppercase()} // ${currentIndex + 1}/${dialogue.size}",
                 color = color,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 12.sp,
