@@ -5,7 +5,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -26,9 +33,19 @@ fun Visualizer(
     activeSignal: SignalData?,
     gain: Int,
     filter: Int,
-    time: Float,
     modifier: Modifier = Modifier
 ) {
+    val transition = rememberInfiniteTransition(label = "scope-time")
+    val time by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 100f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(100000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "scope-time-value"
+    )
+
     Canvas(modifier = modifier
         .fillMaxWidth()
         .padding(horizontal = 8.dp, vertical = 0.dp)
@@ -117,8 +134,12 @@ fun Visualizer(
             val harmonic = sin(i * liveFreq * 2.2f + time * 16f) * 0.2f
             val wave = (fundamental + harmonic) * liveAmp
             
-            val noise = (Math.random() - 0.5f) * noiseLevel
-            livePath.lineTo(x, centerY + wave + noise.toFloat())
+            val signalPhase = (activeSignal?.id?.hashCode() ?: 0) * 0.0001f
+            val noise =
+                (sin(i * 12.9898f + time * 19.7f + signalPhase) * 0.65f +
+                    sin(i * 3.117f - time * 11.3f + signalPhase * 2f) * 0.35f) *
+                    noiseLevel * 0.5f
+            livePath.lineTo(x, centerY + wave + noise)
         }
         
         // Background beam glow for live wave
@@ -146,7 +167,6 @@ fun VisualizerPreview() {
         color = Color.Green,
         activeSignal = null,
         gain = 50,
-        filter = 50,
-        time = 0f
+        filter = 50
     )
 }
