@@ -910,6 +910,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val signal = activeSignalValue ?: return
         val currentHotspot = lockedHotspot ?: return
 
+        if (_gameState.value.phase == GamePhase.THE_INTERVIEW && action != "COMMIT") {
+            addLog("ASSESSMENT RESPONSE REQUIRED. DISCARD CHANNEL LOCKED.", LogType.ERROR)
+            soundManager.playAlert()
+            return
+        }
+
         if (action == "COMMIT") {
             if (_gameState.value.downloadProgress < 100f) {
                 addLog("ERROR: DECRYPTION INCOMPLETE. DOWNLOAD IN PROGRESS.", LogType.ERROR)
