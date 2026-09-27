@@ -58,6 +58,8 @@ fun MainMenuLayout(
     onExit: () -> Unit,
     color: Color
 ) {
+    val hasSavedGame by viewModel.hasSavedGame.collectAsState()
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -115,8 +117,18 @@ fun MainMenuLayout(
                 .padding(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (hasSavedGame) {
+                    TerminalMenuItem(
+                        label = "[00] CONTINUE_SAVED_LINK",
+                        onClick = {
+                            viewModel.playClick()
+                            viewModel.continueGame()
+                        },
+                        color = color
+                    )
+                }
                 TerminalMenuItem(
-                    label = "[01] START_COMMUNICATION_LINK",
+                    label = "[01] START_NEW_COMMUNICATION_LINK",
                     onClick = {
                         viewModel.playClick()
                         onStartGame()
@@ -184,6 +196,42 @@ fun OptionsLayout(
     color: Color
 ) {
     var showResetConfirm by remember { mutableStateOf(false) }
+    var showDeleteSaveConfirm by remember { mutableStateOf(false) }
+    val hasSavedGame by viewModel.hasSavedGame.collectAsState()
+
+    if (showDeleteSaveConfirm) {
+        AlertDialog(
+            onDismissRequest = {
+                viewModel.playClick()
+                showDeleteSaveConfirm = false
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.playClick()
+                    viewModel.deleteSave()
+                    showDeleteSaveConfirm = false
+                }) {
+                    Text("DELETE SAVED RUN", color = Color.Red, fontFamily = FontFamily.Monospace)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.playClick()
+                    showDeleteSaveConfirm = false
+                }) {
+                    Text("CANCEL", color = color, fontFamily = FontFamily.Monospace)
+                }
+            },
+            title = {
+                Text("DELETE SAVED COMMUNICATION LINK", color = Color.Red, fontFamily = FontFamily.Monospace)
+            },
+            text = {
+                Text("Deletes campaign progress only. Interface preferences and operator records are kept.", color = color, fontFamily = FontFamily.Monospace)
+            },
+            containerColor = Color.Black,
+            modifier = Modifier.border(1.dp, color)
+        )
+    }
 
     if (showResetConfirm) {
         AlertDialog(
@@ -212,7 +260,7 @@ fun OptionsLayout(
                 Text("CAUTION: SECURE DATA PURGE", color = Color.Red, fontFamily = FontFamily.Monospace)
             },
             text = {
-                Text("This action will restore all preferences and delete saved scores. Proceed?", color = color, fontFamily = FontFamily.Monospace)
+                Text("This action will restore all preferences and delete campaign progress and saved scores. Proceed?", color = color, fontFamily = FontFamily.Monospace)
             },
             containerColor = Color.Black,
             modifier = Modifier.border(1.dp, color)
@@ -274,6 +322,22 @@ fun OptionsLayout(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (hasSavedGame) {
+                Button(
+                    onClick = {
+                        viewModel.playAlert()
+                        showDeleteSaveConfirm = true
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.08f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color.Red.copy(alpha = 0.7f)),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text("DELETE SAVED RUN", color = Color.Red, fontFamily = FontFamily.Monospace)
+                }
+            }
+
             Button(
                 onClick = {
                     viewModel.playAlert()
