@@ -75,7 +75,8 @@ data class SignalOutcome(
     val locationId: String? = null,
     val actorId: String? = null,
     val intelValue: Int = 1,
-    val effects: List<WorldEffect> = emptyList()
+    val effects: List<WorldEffect> = emptyList(),
+    val commitEffects: List<WorldEffect> = emptyList()
 )
 
 data class SignalData(
