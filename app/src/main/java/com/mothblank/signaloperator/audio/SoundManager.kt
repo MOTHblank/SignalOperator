@@ -255,7 +255,7 @@ class SoundManager(private val context: Context) {
         staticTrack?.flush()
     }
 
-    private inline fun updateAudioParameters(
+    private fun updateAudioParameters(
         transform: (AudioParameters) -> AudioParameters
     ) {
         while (true) {
