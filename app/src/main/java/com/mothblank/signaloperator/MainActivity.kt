@@ -250,7 +250,14 @@ class MainActivity : ComponentActivity() {
                                     )
                                     Spacer(Modifier.width(4.dp))
                                     Text(
-                                        if (gameState.isMapViewActive) "RADIO" else "MAP",
+                                        if (gameState.isMapViewActive) {
+                                            "RADIO"
+                                        } else {
+                                            val alerts = gameState.locations.count {
+                                                it.status != com.mothblank.signaloperator.models.LocationStatus.SECURE
+                                            }
+                                            if (alerts > 0) "MAP [$alerts]" else "MAP"
+                                        },
                                         color = if (gameState.isMapViewActive) Color.White else currentColor,
                                         style = MaterialTheme.typography.labelMedium
                                     )
