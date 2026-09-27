@@ -54,3 +54,7 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2024-10-24 - Overriding Semantics in Interactive ASCII Components
 **Learning:** In custom interactive components that include decorative dynamic ASCII art (like "▮" or ">"), using the standard `semantics` modifier merges the custom content description with the text contents of the component. When focus or hover states change, screen readers will often read out these decorative characters alongside the custom description.
 **Action:** Use `Modifier.clearAndSetSemantics` instead of `semantics` in custom interactive components to completely override the default semantics and prevent screen readers from reading out decorative characters when focus/hover states change.
+
+## 2024-10-25 - Using clearAndSetSemantics Appropriately
+**Learning:** In Jetpack Compose, use `Modifier.clearAndSetSemantics` (instead of `.semantics`) on interactive components containing decorative text/ASCII art to prevent screen readers from reading the decorative elements. However, avoid applying it to large parent containers (like overlays) as it removes all descendant semantics, rendering informative children text inaccessible.
+**Action:** Use `Modifier.clearAndSetSemantics` strategically on individual components like `SectorMapNode` to hide decorative ASCII, but avoid it on broader overlays like `DialogueOverlay` where child text is critical.
