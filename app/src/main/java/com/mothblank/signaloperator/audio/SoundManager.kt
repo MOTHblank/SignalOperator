@@ -17,6 +17,7 @@ import java.io.FileOutputStream
 import java.io.DataOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class SoundManager(private val context: Context) {
@@ -49,6 +50,7 @@ class SoundManager(private val context: Context) {
     // Static Noise System (Procedural)
     private var staticTrack: AudioTrack? = null
     private var staticJob: Job? = null
+    private val staticRequested = AtomicBoolean(false)
     private val audioParameters = AtomicReference(AudioParameters())
 
     // Voice System
@@ -171,6 +173,11 @@ class SoundManager(private val context: Context) {
     }
 
     fun startStatic() {
+        staticRequested.set(true)
+        launchStaticLoop()
+    }
+
+    private fun launchStaticLoop() {
         if (staticJob?.isActive == true) return
         staticTrack?.play()
 
@@ -237,6 +244,11 @@ class SoundManager(private val context: Context) {
     }
 
     fun stopStatic() {
+        staticRequested.set(false)
+        stopStaticLoop()
+    }
+
+    private fun stopStaticLoop() {
         staticJob?.cancel()
         staticJob = null
         staticTrack?.pause()
@@ -428,19 +440,18 @@ class SoundManager(private val context: Context) {
     }
 
     fun pause() {
-        if (staticJob?.isActive == true) {
-            staticTrack?.pause()
-        }
+        stopStaticLoop()
         voiceTrack?.pause()
     }
 
     fun resume() {
-        if (staticJob?.isActive == true) {
-            staticTrack?.play()
+        if (staticRequested.get()) {
+            launchStaticLoop()
         }
     }
 
     fun release() {
+        staticRequested.set(false)
         staticJob?.cancel()
         staticJob = null
         staticTrack?.release()
