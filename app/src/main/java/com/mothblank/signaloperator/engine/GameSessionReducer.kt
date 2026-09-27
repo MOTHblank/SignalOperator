@@ -1,12 +1,7 @@
 package com.mothblank.signaloperator.engine
 
-import com.mothblank.signaloperator.models.Character
-import com.mothblank.signaloperator.models.GamePhase
-import com.mothblank.signaloperator.models.GameState
-import com.mothblank.signaloperator.models.HighScoreEntry
-import com.mothblank.signaloperator.models.Location
-import com.mothblank.signaloperator.models.LocationStatus
-import com.mothblank.signaloperator.models.SignalData
+import com.mothblank.signaloperator.models.*
+import kotlin.math.max
 import kotlin.random.Random
 
 enum class DialogueCue {
@@ -30,101 +25,120 @@ object GameSessionReducer {
         solutionInput: String,
         random: Random = Random.Default
     ): SessionResolution {
-        var archived = current.archivedSignals
-        var ignored = current.ignoredSignals
-        var solved = current.puzzlesSolved
+        var state = current
         val solvedHotspots = current.solvedHotspots.toMutableSet()
-        var locations: List<Location> = current.locations
-        var characters: List<Character> = current.characters
+        solvedHotspots.add(currentHotspot)
 
-        if (action == "COMMIT") {
-            archived += 1
-            solved += 1
-            solvedHotspots.add(currentHotspot)
-
-            val updatedLocations = current.locations.toMutableList()
-            val searchText = "${signal.solution} ${signal.encodedMessage}".uppercase()
-            val targetLoc = when {
-                searchText.contains("SITE ALPHA") -> updatedLocations.find { it.name == "SITE ALPHA" }
-                searchText.contains("SECTOR 4") -> updatedLocations.find { it.name == "SECTOR 4 RELAY" }
-                searchText.contains("OUTPOST") -> updatedLocations.find { it.name == "ALPHA OUTPOST" }
-                else -> null
+        when (signal.kind) {
+            SignalKind.MISSION -> {
+                state = if (action == "COMMIT") {
+                    applyOutcome(
+                        state.copy(
+                            archivedSignals = state.archivedSignals + 1,
+                            puzzlesSolved = state.puzzlesSolved + 1
+                        ),
+                        signal.outcome
+                    )
+                } else {
+                    state.copy(
+                        ignoredSignals = state.ignoredSignals + 1,
+                        puzzlesSolved = state.puzzlesSolved + 1,
+                        trustInEcho = (state.trustInEcho - 4).coerceIn(0, 100),
+                        containmentIntegrity = (state.containmentIntegrity - 3).coerceIn(0, 100)
+                    )
+                }
             }
 
-            if (targetLoc != null) {
-                val index = updatedLocations.indexOf(targetLoc)
-                updatedLocations[index] = targetLoc.copy(status = LocationStatus.INVESTIGATING)
+            SignalKind.DEAD_DROP -> {
+                state = if (action == "COMMIT") {
+                    applyOutcome(
+                        state.copy(deadDropsRecovered = state.deadDropsRecovered + 1),
+                        signal.outcome
+                    )
+                } else {
+                    state.copy(
+                        ignoredSignals = state.ignoredSignals + 1,
+                        exposure = (state.exposure - 2).coerceIn(0, 100)
+                    )
+                }
             }
 
-            val updatedCharacters = current.characters.toMutableList()
-            if (
-                updatedCharacters.isNotEmpty() &&
-                updatedLocations.isNotEmpty() &&
-                random.nextFloat() < 0.5f
-            ) {
-                val charIndex = random.nextInt(updatedCharacters.size)
-                val randomLoc = updatedLocations.random(random)
-                updatedCharacters[charIndex] =
-                    updatedCharacters[charIndex].copy(locationId = randomLoc.id)
-            }
-
-            locations = updatedLocations
-            characters = updatedCharacters
-        } else {
-            ignored += 1
-            if (signal.solution == "DISCARD") {
-                solvedHotspots.add(currentHotspot)
+            SignalKind.MUNDANE_BROADCAST -> {
+                state = if (action == "DISCARD") {
+                    state.copy(routineBroadcastsCleared = state.routineBroadcastsCleared + 1)
+                } else {
+                    state.copy(exposure = (state.exposure + 2).coerceIn(0, 100))
+                }
             }
         }
 
-        var nextPhase = current.phase
-        var corruption = current.corruptionLevel
-        var required = current.puzzlesRequired
+        state = state.copy(
+            solvedHotspots = solvedHotspots,
+            downloadProgress = 0f
+        )
+
         var dialogueCue: DialogueCue? = null
         var highScore: HighScoreEntry? = null
 
-        if (solved >= current.puzzlesRequired) {
-            when (current.phase) {
+        if (signal.kind == SignalKind.MISSION && state.puzzlesSolved >= state.puzzlesRequired) {
+            when (state.phase) {
                 GamePhase.APTITUDE_TEST -> {
-                    nextPhase = GamePhase.LIVE_INTRUSION
-                    required = 5
-                    solved = 0
-                    solvedHotspots.clear()
+                    state = state.copy(
+                        phase = GamePhase.LIVE_INTRUSION,
+                        puzzlesRequired = 5,
+                        puzzlesSolved = 0,
+                        solvedHotspots = emptySet()
+                    )
                     dialogueCue = DialogueCue.LIVE_INTRUSION
                 }
 
                 GamePhase.LIVE_INTRUSION -> {
-                    nextPhase = GamePhase.ACTIVE_INVESTIGATION
-                    required = 6
-                    solved = 0
-                    solvedHotspots.clear()
-                    corruption = 1f
+                    state = state.copy(
+                        phase = GamePhase.ACTIVE_INVESTIGATION,
+                        puzzlesRequired = 6,
+                        puzzlesSolved = 0,
+                        solvedHotspots = emptySet(),
+                        corruptionLevel = max(state.corruptionLevel, 1f)
+                    )
                     dialogueCue = DialogueCue.ACTIVE_INVESTIGATION
                 }
 
                 GamePhase.ACTIVE_INVESTIGATION -> {
-                    nextPhase = GamePhase.THE_INTERVIEW
-                    required = 3
-                    solved = 0
-                    solvedHotspots.clear()
-                    corruption = 2f
+                    state = state.copy(
+                        phase = GamePhase.THE_INTERVIEW,
+                        puzzlesRequired = 3,
+                        puzzlesSolved = 0,
+                        solvedHotspots = emptySet(),
+                        corruptionLevel = max(state.corruptionLevel, 2f)
+                    )
                     dialogueCue = DialogueCue.THE_INTERVIEW
                 }
 
                 GamePhase.THE_INTERVIEW -> {
-                    nextPhase = when (solutionInput.uppercase().trim()) {
-                        "I ACCEPT" -> GamePhase.ENDING_COMPLIANCE
-                        "I REFUSE" -> GamePhase.ENDING_SEVERED
-                        else -> GamePhase.ENDING_CONTAINMENT
-                    }
-                    solved = 0
-                    solvedHotspots.clear()
+                    val ending = resolveEnding(state, solutionInput)
+                    state = state.copy(
+                        phase = ending.first,
+                        puzzlesSolved = 0,
+                        solvedHotspots = emptySet(),
+                        endingSummary = ending.second
+                    )
+
+                    val strategicBonus =
+                        state.containmentIntegrity * 10 +
+                        state.trustInEcho * 4 +
+                        state.breachesPrevented * 500 +
+                        state.deadDropsRecovered * 250
 
                     highScore = HighScoreEntry(
                         operatorId = "OP-${current.seed % 1000}",
-                        maxPhase = nextPhase.name.replace("ENDING_", ""),
-                        intelSaved = archived,
-                        score = (archived * 1000 - ignored * 200).coerceAtLeast(0)
+                        maxPhase = state.phase.name.replace("ENDING_", ""),
+                        intelSaved = state.archivedSignals,
+                        score = (
+                            state.archivedSignals * 1000 -
+                                state.ignoredSignals * 250 +
+                                strategicBonus -
+                                state.exposure * 5
+                            ).coerceAtLeast(0)
                     )
                 }
 
@@ -132,21 +146,188 @@ object GameSessionReducer {
             }
         }
 
+        val corruptedNodes = state.locations.count { it.status == LocationStatus.CORRUPTED }
+        val systemicCorruption = (
+            state.exposure / 45f +
+                corruptedNodes * 0.45f +
+                (100 - state.containmentIntegrity) / 80f
+            ).coerceIn(0f, 3f)
+
+        state = state.copy(corruptionLevel = max(state.corruptionLevel, systemicCorruption))
+
         return SessionResolution(
-            state = current.copy(
-                phase = nextPhase,
-                corruptionLevel = corruption,
-                archivedSignals = archived,
-                ignoredSignals = ignored,
-                puzzlesSolved = solved,
-                puzzlesRequired = required,
-                solvedHotspots = solvedHotspots,
-                locations = locations,
-                characters = characters,
-                downloadProgress = 0f
-            ),
+            state = state,
             dialogueCue = dialogueCue,
             highScore = highScore
         )
+    }
+
+    private fun applyOutcome(state: GameState, outcome: SignalOutcome?): GameState {
+        if (outcome == null) return state
+
+        var locations = state.locations
+        var characters = state.characters
+        var trust = state.trustInEcho
+        var exposure = state.exposure
+        var containment = state.containmentIntegrity
+        var charges = state.securityCharges
+
+        outcome.effects.forEach { effect ->
+            when (effect.type) {
+                WorldEffectType.ADD_LOCATION_THREAT -> {
+                    locations = locations.map { location ->
+                        if (location.id == effect.targetId) {
+                            val threat = (location.threat + effect.amount).coerceIn(0, 100)
+                            location.copy(
+                                threat = threat,
+                                status = if (
+                                    threat >= location.security &&
+                                    location.status == LocationStatus.SECURE
+                                ) LocationStatus.INVESTIGATING else location.status
+                            )
+                        } else {
+                            location
+                        }
+                    }
+                }
+
+                WorldEffectType.ADD_LOCATION_SECURITY -> {
+                    locations = locations.map { location ->
+                        if (location.id == effect.targetId) {
+                            location.copy(
+                                security = (location.security + effect.amount).coerceIn(0, 100)
+                            )
+                        } else {
+                            location
+                        }
+                    }
+                }
+
+                WorldEffectType.MARK_LOCATION_INVESTIGATING -> {
+                    locations = locations.map { location ->
+                        if (
+                            location.id == effect.targetId &&
+                            location.status != LocationStatus.CORRUPTED
+                        ) {
+                            location.copy(status = LocationStatus.INVESTIGATING)
+                        } else {
+                            location
+                        }
+                    }
+                }
+
+                WorldEffectType.MOVE_CHARACTER -> {
+                    characters = characters.map { character ->
+                        if (character.id == effect.targetId) {
+                            character.copy(locationId = effect.destinationId)
+                        } else {
+                            character
+                        }
+                    }
+                }
+
+                WorldEffectType.SET_CHARACTER_ACTIVE -> {
+                    characters = characters.map { character ->
+                        if (character.id == effect.targetId) {
+                            character.copy(status = CharacterStatus.ACTIVE)
+                        } else {
+                            character
+                        }
+                    }
+                }
+
+                WorldEffectType.SET_CHARACTER_MIA -> {
+                    characters = characters.map { character ->
+                        if (character.id == effect.targetId) {
+                            character.copy(status = CharacterStatus.MIA)
+                        } else {
+                            character
+                        }
+                    }
+                }
+
+                WorldEffectType.SET_CHARACTER_COMPROMISED -> {
+                    characters = characters.map { character ->
+                        if (character.id == effect.targetId) {
+                            character.copy(status = CharacterStatus.COMPROMISED)
+                        } else {
+                            character
+                        }
+                    }
+                }
+
+                WorldEffectType.ADD_TRUST -> trust = (trust + effect.amount).coerceIn(0, 100)
+                WorldEffectType.ADD_EXPOSURE -> exposure = (exposure + effect.amount).coerceIn(0, 100)
+                WorldEffectType.ADD_CONTAINMENT -> containment = (containment + effect.amount).coerceIn(0, 100)
+                WorldEffectType.ADD_SECURITY_CHARGES -> charges = (charges + effect.amount).coerceIn(0, 9)
+            }
+        }
+
+        return state.copy(
+            locations = locations,
+            characters = characters,
+            trustInEcho = trust,
+            exposure = exposure,
+            containmentIntegrity = containment,
+            securityCharges = charges
+        )
+    }
+
+    private fun resolveEnding(
+        state: GameState,
+        solutionInput: String
+    ): Pair<GamePhase, String> {
+        val response = solutionInput.uppercase().trim()
+        val compromisedAgents = state.characters.count {
+            it.status == CharacterStatus.COMPROMISED || it.status == CharacterStatus.MIA
+        }
+        val corruptedNodes = state.locations.count { it.status == LocationStatus.CORRUPTED }
+
+        return when (response) {
+            "I ACCEPT" -> {
+                if (
+                    state.containmentIntegrity >= 85 &&
+                    state.exposure <= 30 &&
+                    corruptedNodes == 0
+                ) {
+                    GamePhase.ENDING_CONTAINMENT to
+                        "You opened the channel, but the network you preserved closed around the entity first. The terminal remains a prison rather than a doorway."
+                } else {
+                    GamePhase.ENDING_COMPLIANCE to
+                        "Your accumulated exposure made the final invitation actionable. The entity inherits the channels you left open."
+                }
+            }
+
+            "I REFUSE" -> {
+                if (
+                    state.containmentIntegrity >= 40 &&
+                    state.trustInEcho >= 35 &&
+                    compromisedAgents <= 1
+                ) {
+                    GamePhase.ENDING_SEVERED to
+                        "The refusal holds because enough of the field network survived to carry the shutdown command. The carrier disappears."
+                } else {
+                    GamePhase.ENDING_CONTAINMENT to
+                        "You refuse, but the damaged network cannot execute a clean sever. Emergency containment seals the remaining nodes at considerable cost."
+                }
+            }
+
+            else -> {
+                if (state.exposure >= 65 && state.containmentIntegrity < 50) {
+                    GamePhase.ENDING_COMPLIANCE to
+                        "Hesitation arrives after too much exposure. The terminal answers on your behalf."
+                } else if (
+                    state.trustInEcho >= 70 &&
+                    state.containmentIntegrity >= 55 &&
+                    compromisedAgents == 0
+                ) {
+                    GamePhase.ENDING_SEVERED to
+                        "You cannot answer, so ECHO executes the contingency you preserved for them. The link is cut from the far side."
+                } else {
+                    GamePhase.ENDING_CONTAINMENT to
+                        "No final trust decision is made. The surviving network defaults to containment and isolates the operator with the signal."
+                }
+            }
+        }
     }
 }
