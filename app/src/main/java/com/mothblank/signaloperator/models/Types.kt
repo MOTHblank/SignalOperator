@@ -197,7 +197,8 @@ data class GameState(
     val currentMenuScreen: MenuSubScreen = MenuSubScreen.MAIN,
     val isCrtEffectEnabled: Boolean = true,
     val isSoundEnabled: Boolean = true,
-    val isTtsEnabled: Boolean = true
+    val isTtsEnabled: Boolean = true,
+    val isHapticsEnabled: Boolean = true
 )
 
 data class HighScoreEntry(
