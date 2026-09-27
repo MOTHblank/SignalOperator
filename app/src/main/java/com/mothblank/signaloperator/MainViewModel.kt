@@ -187,19 +187,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun initializeWorld() {
         val initialLocations = listOf(
-            Location("loc-1", "SITE ALPHA", 0.2f, 0.3f),
-            Location("loc-2", "SECTOR 4 RELAY", 0.5f, 0.5f),
-            Location("loc-3", "ALPHA OUTPOST", 0.8f, 0.2f),
-            Location("loc-4", "EXCLUSION ZONE", 0.6f, 0.8f)
+            Location("loc-1", "SITE ALPHA", 0.2f, 0.3f, security = 65),
+            Location("loc-2", "SECTOR 4 RELAY", 0.5f, 0.5f, security = 55),
+            Location("loc-3", "ALPHA OUTPOST", 0.8f, 0.2f, security = 50),
+            Location("loc-4", "EXCLUSION ZONE", 0.6f, 0.8f, security = 35, threat = 15)
         )
         val initialCharacters = listOf(
             Character("char-1", "ECHO-ACTUAL", "loc-1"),
             Character("char-2", "ECHO-2", "loc-3"),
             Character("char-3", "THE SUBJECT", null, CharacterStatus.ANOMALY)
         )
+        val initialLinks = listOf(
+            NetworkLink("link-1", "loc-1", "loc-2"),
+            NetworkLink("link-2", "loc-2", "loc-3"),
+            NetworkLink("link-3", "loc-2", "loc-4"),
+            NetworkLink("link-4", "loc-1", "loc-3")
+        )
         _gameState.value = _gameState.value.copy(
             locations = initialLocations,
-            characters = initialCharacters
+            characters = initialCharacters,
+            networkLinks = initialLinks
         )
     }
 
@@ -240,15 +247,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 Log.e("MainViewModel", "Error parsing highscores", e)
             }
-        }
-        
-        if (list.isEmpty()) {
-            list.add(HighScoreEntry("OP-102", "THE_INTERVIEW", 6, 5400))
-            list.add(HighScoreEntry("OP-412", "ACTIVE_INVESTIGATION", 5, 4500))
-            list.add(HighScoreEntry("OP-209", "LIVE_INTRUSION", 3, 2700))
-            list.add(HighScoreEntry("OP-901", "APTITUDE_TEST", 2, 1800))
-            list.add(HighScoreEntry("OP-012", "APTITUDE_TEST", 1, 900))
-            saveHighScoresRaw(list)
         }
         
         list.sortByDescending { it.score }
@@ -468,11 +466,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (isRuntimeActive() &&
                     state.activeRouterGame == null &&
                     (state.phase == GamePhase.ACTIVE_INVESTIGATION || state.phase == GamePhase.THE_INTERVIEW)) {
-                    val secureLocations = state.locations.filter { it.status == LocationStatus.SECURE }
-                    if (secureLocations.isNotEmpty()) {
-                        val targetLoc = secureLocations.random()
+                    val breachCandidates = state.locations
+                        .filter {
+                            it.status == LocationStatus.INVESTIGATING ||
+                                (it.status == LocationStatus.SECURE && it.threat >= it.security)
+                        }
+                        .sortedByDescending { it.threat - it.security }
+
+                    val targetLoc = breachCandidates.firstOrNull()
+                    if (targetLoc != null) {
                         startRouterGame(targetLoc.id)
-                        addLog("WARNING: SECURITY COMPROMISE AT ${targetLoc.name}. FIREWALL OFFLINE.", LogType.ERROR)
+                        addLog(
+                            "WARNING: ${targetLoc.name} THREAT ${targetLoc.threat} / SECURITY ${targetLoc.security}. FIREWALL CHALLENGE REQUIRED.",
+                            LogType.ERROR
+                        )
                         saveGame()
                     }
                 }
@@ -486,9 +493,79 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun handleLocationClick(location: Location) {
-        if (location.status == LocationStatus.INVESTIGATING) {
-            startRouterGame(location.id)
+        when (location.status) {
+            LocationStatus.INVESTIGATING -> startRouterGame(location.id)
+            LocationStatus.SECURE -> reinforceLocation(location.id)
+            LocationStatus.CORRUPTED -> attemptNodeRecovery(location.id)
         }
+    }
+
+    private fun reinforceLocation(locationId: String) {
+        val state = _gameState.value
+        if (state.securityCharges <= 0) {
+            addLog("REINFORCEMENT FAILED: NO SECURITY CHARGES AVAILABLE.", LogType.ERROR)
+            soundManager.playAlert()
+            return
+        }
+
+        val target = state.locations.firstOrNull { it.id == locationId } ?: return
+        val updated = state.locations.map { location ->
+            if (location.id == locationId) {
+                location.copy(
+                    security = (location.security + 20).coerceAtMost(100),
+                    threat = (location.threat - 10).coerceAtLeast(0)
+                )
+            } else {
+                location
+            }
+        }
+
+        _gameState.value = state.copy(
+            locations = updated,
+            securityCharges = state.securityCharges - 1,
+            containmentIntegrity = (state.containmentIntegrity + 3).coerceAtMost(100)
+        )
+        addLog("REINFORCED ${target.name}: +20 SECURITY / -10 THREAT.", LogType.ACTION)
+        soundManager.triggerHaptic("BUTTON_CLICK")
+        saveGame()
+    }
+
+    private fun attemptNodeRecovery(locationId: String) {
+        val state = _gameState.value
+        if (state.securityCharges < 2) {
+            addLog("RECOVERY REQUIRES 2 SECURITY CHARGES.", LogType.ERROR)
+            soundManager.playAlert()
+            return
+        }
+
+        val target = state.locations.firstOrNull { it.id == locationId } ?: return
+        val updatedLocations = state.locations.map { location ->
+            if (location.id == locationId) {
+                location.copy(
+                    status = LocationStatus.INVESTIGATING,
+                    security = 35,
+                    threat = 55
+                )
+            } else {
+                location
+            }
+        }
+        val updatedLinks = state.networkLinks.map { link ->
+            if (link.fromLocationId == locationId || link.toLocationId == locationId) {
+                link.copy(status = LinkStatus.JAMMED)
+            } else {
+                link
+            }
+        }
+
+        _gameState.value = state.copy(
+            locations = updatedLocations,
+            networkLinks = updatedLinks,
+            securityCharges = state.securityCharges - 2
+        )
+        addLog("RECOVERY ROUTE OPENED FOR ${target.name}. FIREWALL REPAIR REQUIRED.", LogType.ACTION)
+        startRouterGame(locationId)
+        saveGame()
     }
 
     fun selectLogEntry(log: LogEntry?) {
@@ -721,7 +798,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             _gameState.value.seed,
                             getSystemData(),
                             _gameState.value.puzzlesSolved,
-                            hotspotKinds[activeHotspot]
+                            hotspotKinds[activeHotspot],
+                            _gameState.value
                         )
                     )
                     activeSignalFrequency = activeHotspot
@@ -813,22 +891,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (action == "COMMIT") {
-            addLog("TRANSMISSION SUCCESSFUL. INTEL LOGGED.", LogType.ACTION)
-            if (current.phase != GamePhase.THE_INTERVIEW) {
-                addLog("DECODED: ${signal.solution.uppercase()}", LogType.SYSTEM)
-                addLog(
-                    "PROGRESS: ${current.puzzlesSolved + 1} / ${current.puzzlesRequired} INTEL RECOVERED.",
-                    LogType.SYSTEM
-                )
-            } else {
-                addLog("TRANSMITTED: ${solutionInput.uppercase()}", LogType.SYSTEM)
-                addLog(
-                    "ASSESSMENT PROGRESS: ${current.puzzlesSolved + 1} / ${current.puzzlesRequired}",
-                    LogType.SYSTEM
-                )
+            when (signal.kind) {
+                SignalKind.MISSION -> {
+                    addLog("TRANSMISSION SUCCESSFUL. INTEL LOGGED.", LogType.ACTION)
+                    if (current.phase != GamePhase.THE_INTERVIEW) {
+                        addLog("DECODED: ${signal.solution.uppercase()}", LogType.SYSTEM)
+                        addLog(
+                            "MISSION TRAFFIC PROCESSED: ${current.puzzlesSolved + 1} / ${current.puzzlesRequired}",
+                            LogType.SYSTEM
+                        )
+                    } else {
+                        addLog("TRANSMITTED: ${solutionInput.uppercase()}", LogType.SYSTEM)
+                    }
+                }
+                SignalKind.DEAD_DROP -> addLog("KERNEL TELEMETRY RECOVERED.", LogType.ACTION)
+                SignalKind.MUNDANE_BROADCAST -> addLog("PUBLIC BAND MISCLASSIFIED AS INTEL.", LogType.ERROR)
             }
         } else {
-            addLog("SIGNAL DISCARDED.", LogType.ACTION)
+            when (signal.kind) {
+                SignalKind.MISSION -> addLog("MISSION TRAFFIC DELIBERATELY IGNORED.", LogType.ERROR)
+                SignalKind.DEAD_DROP -> addLog("KERNEL TELEMETRY DISCARDED.", LogType.ACTION)
+                SignalKind.MUNDANE_BROADCAST -> addLog("CIVILIAN CARRIER CLEARED.", LogType.ACTION)
+            }
         }
         stopRadioLoop()
 
@@ -841,6 +925,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         val nextState = resolution.state
         _gameState.value = nextState
+        if (action == "COMMIT") {
+            signal.outcome?.briefing?.let {
+                addLog("FIELD EFFECT: $it", LogType.INTERCEPT)
+            }
+        }
 
         when (resolution.dialogueCue) {
             DialogueCue.LIVE_INTRUSION -> {
@@ -956,17 +1045,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         addLog("SECURITY BREACH: NODE CONTROL LOST.", LogType.ERROR)
         soundManager.playAlert()
 
-        val updatedLocations = _gameState.value.locations.map {
+        val state = _gameState.value
+        val updatedLocations = state.locations.map {
             if (it.id == game.locationId) {
-                it.copy(status = LocationStatus.CORRUPTED)
+                it.copy(status = LocationStatus.CORRUPTED, security = 0, threat = 100)
             } else {
                 it
             }
         }
+        val updatedLinks = state.networkLinks.map { link ->
+            if (link.fromLocationId == game.locationId || link.toLocationId == game.locationId) {
+                link.copy(status = LinkStatus.CORRUPTED)
+            } else {
+                link
+            }
+        }
+        val updatedCharacters = state.characters.map { character ->
+            if (character.locationId == game.locationId && character.status == CharacterStatus.ACTIVE) {
+                character.copy(status = CharacterStatus.COMPROMISED)
+            } else {
+                character
+            }
+        }
 
-        _gameState.value = _gameState.value.copy(
+        _gameState.value = state.copy(
             locations = updatedLocations,
-            activeRouterGame = null
+            networkLinks = updatedLinks,
+            characters = updatedCharacters,
+            activeRouterGame = null,
+            containmentIntegrity = (state.containmentIntegrity - 18).coerceAtLeast(0),
+            exposure = (state.exposure + 8).coerceAtMost(100)
         )
         saveGame()
     }
@@ -989,17 +1097,33 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         addLog("FIREWALL SYNC SUCCESSFUL. NODE SECURED.", LogType.ACTION)
         soundManager.triggerHaptic("BUTTON_CLICK")
 
-        val updatedLocations = _gameState.value.locations.map {
+        val state = _gameState.value
+        val updatedLocations = state.locations.map {
             if (it.id == game.locationId) {
-                it.copy(status = LocationStatus.SECURE)
+                it.copy(
+                    status = LocationStatus.SECURE,
+                    security = (it.security + 15).coerceAtMost(100),
+                    threat = (it.threat - 35).coerceAtLeast(0)
+                )
             } else {
                 it
             }
         }
+        val updatedLinks = state.networkLinks.map { link ->
+            if (link.fromLocationId == game.locationId || link.toLocationId == game.locationId) {
+                link.copy(status = LinkStatus.ACTIVE)
+            } else {
+                link
+            }
+        }
 
-        _gameState.value = _gameState.value.copy(
+        _gameState.value = state.copy(
             locations = updatedLocations,
-            activeRouterGame = null
+            networkLinks = updatedLinks,
+            activeRouterGame = null,
+            breachesPrevented = state.breachesPrevented + 1,
+            containmentIntegrity = (state.containmentIntegrity + 6).coerceAtMost(100),
+            securityCharges = (state.securityCharges + 1).coerceAtMost(9)
         )
         saveGame()
     }
