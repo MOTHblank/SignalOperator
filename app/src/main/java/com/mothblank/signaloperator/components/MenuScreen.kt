@@ -351,6 +351,16 @@ fun OptionsLayout(
             color = color
         )
 
+        Spacer(modifier = Modifier.height(16.dp))
+
+        TerminalToggleOption(
+            label = "TACTILE CONSOLE FEEDBACK",
+            description = "Haptic detents, carrier lock pulses, and firewall connection feedback.",
+            enabled = gameState.isHapticsEnabled,
+            onToggle = { viewModel.toggleHaptics() },
+            color = color
+        )
+
         Spacer(modifier = Modifier.height(32.dp))
 
         // Actions
