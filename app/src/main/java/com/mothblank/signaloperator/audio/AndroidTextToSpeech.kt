@@ -96,7 +96,7 @@ class AndroidTextToSpeech(
                 val floatCount = rawBytes.size / Float.SIZE_BYTES
                 val byteBuffer = ByteBuffer.wrap(rawBytes).order(ByteOrder.LITTLE_ENDIAN)
                 FloatArray(floatCount) {
-                    byteBuffer.float.coerceIn(-1f, 1f)
+                    byteBuffer.getFloat().coerceIn(-1f, 1f)
                 }
             }
 
