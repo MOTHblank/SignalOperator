@@ -1,9 +1,6 @@
 package com.mothblank.signaloperator.engine
 
-import com.mothblank.signaloperator.models.GamePhase
-import com.mothblank.signaloperator.models.PuzzleType
-import com.mothblank.signaloperator.models.SignalData
-import com.mothblank.signaloperator.models.SignalKind
+import com.mothblank.signaloperator.models.*
 import kotlin.random.Random
 
 data class SystemData(
@@ -18,7 +15,8 @@ data class SignalRequest(
     val seed: Long,
     val systemData: SystemData? = null,
     val solvedPuzzlesCount: Int = 0,
-    val requestedKind: SignalKind? = null
+    val requestedKind: SignalKind? = null,
+    val worldState: GameState? = null
 )
 
 class ProceduralSignalEngine {
@@ -480,6 +478,27 @@ class ProceduralSignalEngine {
             }
         }
 
+        val outcome = when (signalKind) {
+            SignalKind.MISSION -> buildMissionOutcome(
+                phase = phase,
+                solvedPuzzlesCount = solvedPuzzlesCount,
+                random = random,
+                worldState = request.worldState
+            )
+            SignalKind.DEAD_DROP -> SignalOutcome(
+                eventId = "dead-drop-$id",
+                briefing = "Recovered kernel telemetry can be converted into one network reinforcement charge.",
+                urgency = Urgency.ELEVATED,
+                intelValue = 0,
+                effects = listOf(
+                    WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 1),
+                    WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = 4),
+                    WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 3)
+                )
+            )
+            SignalKind.MUNDANE_BROADCAST -> null
+        }
+
         return SignalData(
             id = id,
             frequency = frequency,
@@ -493,7 +512,215 @@ class ProceduralSignalEngine {
             sender = sender,
             isAnomalous = isAnomalous,
             metadata = metadata,
-            kind = signalKind
+            kind = signalKind,
+            outcome = outcome
         )
+    }
+
+    private fun buildMissionOutcome(
+        phase: GamePhase,
+        solvedPuzzlesCount: Int,
+        random: Random,
+        worldState: GameState?
+    ): SignalOutcome {
+        val activeEcho2 = worldState?.characters
+            ?.firstOrNull { it.id == "char-2" }
+            ?.status == CharacterStatus.ACTIVE
+
+        return when (phase) {
+            GamePhase.APTITUDE_TEST -> {
+                val targetId = if (solvedPuzzlesCount % 2 == 0) "loc-1" else "loc-3"
+                SignalOutcome(
+                    eventId = "aptitude-${solvedPuzzlesCount}",
+                    briefing = if (targetId == "loc-1") {
+                        "Training packet identifies SITE ALPHA as the current verification node."
+                    } else {
+                        "Training packet routes a simulated recovery team through ALPHA OUTPOST."
+                    },
+                    urgency = Urgency.ROUTINE,
+                    locationId = targetId,
+                    intelValue = 1,
+                    effects = listOf(
+                        WorldEffect(WorldEffectType.ADD_LOCATION_SECURITY, targetId = targetId, amount = 5)
+                    )
+                )
+            }
+
+            GamePhase.LIVE_INTRUSION -> when (solvedPuzzlesCount % 5) {
+                0 -> SignalOutcome(
+                    eventId = "live-site-alpha-pressure",
+                    briefing = "An external carrier is probing SITE ALPHA. Firewall pressure is rising.",
+                    urgency = Urgency.HIGH,
+                    locationId = "loc-1",
+                    intelValue = 2,
+                    effects = listOf(
+                        WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-1", amount = 35),
+                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-1"),
+                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = -4)
+                    )
+                )
+
+                1 -> SignalOutcome(
+                    eventId = "live-echo2-relay",
+                    briefing = if (activeEcho2) {
+                        "ECHO-2 has broken contact and is moving toward the SECTOR 4 RELAY."
+                    } else {
+                        "A transmission using ECHO-2 authentication is originating from SECTOR 4."
+                    },
+                    urgency = Urgency.HIGH,
+                    locationId = "loc-2",
+                    actorId = "char-2",
+                    intelValue = 2,
+                    effects = listOf(
+                        WorldEffect(
+                            WorldEffectType.MOVE_CHARACTER,
+                            targetId = "char-2",
+                            destinationId = "loc-2"
+                        ),
+                        WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-2", amount = 30),
+                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-2"),
+                        WorldEffect(WorldEffectType.ADD_TRUST, amount = if (activeEcho2) 5 else -5)
+                    )
+                )
+
+                2 -> SignalOutcome(
+                    eventId = "live-outpost-extraction",
+                    briefing = "ALPHA OUTPOST is requesting emergency extraction authority.",
+                    urgency = Urgency.HIGH,
+                    locationId = "loc-3",
+                    intelValue = 2,
+                    effects = listOf(
+                        WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-3", amount = 40),
+                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-3"),
+                        WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 1)
+                    )
+                )
+
+                3 -> SignalOutcome(
+                    eventId = "live-echo-actual",
+                    briefing = "ECHO-ACTUAL confirms the anomaly is propagating through the relay network, not moving physically.",
+                    urgency = Urgency.ELEVATED,
+                    locationId = "loc-2",
+                    actorId = "char-1",
+                    intelValue = 2,
+                    effects = listOf(
+                        WorldEffect(
+                            WorldEffectType.MOVE_CHARACTER,
+                            targetId = "char-1",
+                            destinationId = "loc-1"
+                        ),
+                        WorldEffect(WorldEffectType.ADD_TRUST, amount = 8),
+                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 5)
+                    )
+                )
+
+                else -> SignalOutcome(
+                    eventId = "live-exclusion-zone",
+                    briefing = "The EXCLUSION ZONE is broadcasting a carrier with no registered transmitter.",
+                    urgency = Urgency.CRITICAL,
+                    locationId = "loc-4",
+                    intelValue = 3,
+                    effects = listOf(
+                        WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-4", amount = 50),
+                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-4"),
+                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 10),
+                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = -8)
+                    )
+                )
+            }
+
+            GamePhase.ACTIVE_INVESTIGATION -> when (solvedPuzzlesCount % 6) {
+                0 -> SignalOutcome(
+                    eventId = "active-echo2-voiceprint",
+                    briefing = "Voiceprint drift suggests ECHO-2 may no longer be the sole source of ECHO-2 transmissions.",
+                    urgency = Urgency.CRITICAL,
+                    locationId = "loc-2",
+                    actorId = "char-2",
+                    intelValue = 3,
+                    effects = listOf(
+                        WorldEffect(WorldEffectType.SET_CHARACTER_COMPROMISED, targetId = "char-2"),
+                        WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-2", amount = 35),
+                        WorldEffect(WorldEffectType.ADD_TRUST, amount = -12),
+                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 8)
+                    )
+                )
+
+                1 -> SignalOutcome(
+                    eventId = "active-site-alpha-anchor",
+                    briefing = "SITE ALPHA still contains a functioning reality anchor. Keeping the node secure will stabilize the network.",
+                    urgency = Urgency.HIGH,
+                    locationId = "loc-1",
+                    intelValue = 3,
+                    effects = listOf(
+                        WorldEffect(WorldEffectType.ADD_LOCATION_SECURITY, targetId = "loc-1", amount = 15),
+                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = 8)
+                    )
+                )
+
+                2 -> SignalOutcome(
+                    eventId = "active-outpost-missing",
+                    briefing = "ALPHA OUTPOST reports one field team missing after entering a dead radio zone.",
+                    urgency = Urgency.CRITICAL,
+                    locationId = "loc-3",
+                    actorId = "char-1",
+                    intelValue = 3,
+                    effects = listOf(
+                        WorldEffect(WorldEffectType.SET_CHARACTER_MIA, targetId = "char-1"),
+                        WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-3", amount = 45),
+                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-3"),
+                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = -10)
+                    )
+                )
+
+                3 -> SignalOutcome(
+                    eventId = "active-relay-isolation",
+                    briefing = "Relay analysis proves the anomaly can be slowed by isolating compromised network paths.",
+                    urgency = Urgency.HIGH,
+                    locationId = "loc-2",
+                    intelValue = 3,
+                    effects = listOf(
+                        WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 1),
+                        WorldEffect(WorldEffectType.ADD_TRUST, amount = 6)
+                    )
+                )
+
+                4 -> SignalOutcome(
+                    eventId = "active-subject-proximity",
+                    briefing = "THE SUBJECT is not inside the exclusion zone. The signal origin is converging on the operator terminal.",
+                    urgency = Urgency.CRITICAL,
+                    actorId = "char-3",
+                    intelValue = 4,
+                    effects = listOf(
+                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 18),
+                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = -12)
+                    )
+                )
+
+                else -> SignalOutcome(
+                    eventId = "active-last-anchor",
+                    briefing = "A final synchronization burst exposes which secured nodes can still support containment.",
+                    urgency = Urgency.CRITICAL,
+                    locationId = listOf("loc-1", "loc-2", "loc-3").random(random),
+                    intelValue = 4,
+                    effects = listOf(
+                        WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 2),
+                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 6)
+                    )
+                )
+            }
+
+            GamePhase.THE_INTERVIEW -> SignalOutcome(
+                eventId = "interview-${solvedPuzzlesCount}",
+                briefing = "The entity is evaluating the operator using the state of the network and prior decisions.",
+                urgency = Urgency.CRITICAL,
+                intelValue = 0
+            )
+
+            else -> SignalOutcome(
+                eventId = "ending",
+                briefing = "No further operational effect.",
+                intelValue = 0
+            )
+        }
     }
 }
