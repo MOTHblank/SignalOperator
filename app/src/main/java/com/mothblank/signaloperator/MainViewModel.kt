@@ -1110,9 +1110,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private var routerCountdownJob: Job? = null
+    private var routerCompleting = false
 
     fun startRouterGame(locationId: String) {
         if (!isRuntimeActive()) return
+        routerCompleting = false
 
         val routerState = RouterPuzzleEngine.create(
             locationId = locationId,
@@ -1148,6 +1150,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun failRouterGame() {
+        routerCompleting = false
         routerCountdownJob?.cancel()
         val game = _gameState.value.activeRouterGame ?: return
         addLog("SECURITY BREACH: NODE CONTROL LOST.", LogType.ERROR)
@@ -1188,6 +1191,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun rotateRouterTile(x: Int, y: Int) {
+        if (routerCompleting) return
         val game = _gameState.value.activeRouterGame ?: return
         val nextState = RouterPuzzleEngine.rotate(game, x, y)
         val connectedNeighbors = RouterPuzzleEngine.connectedNeighborCount(nextState, x, y)
@@ -1196,12 +1200,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _gameState.value = _gameState.value.copy(activeRouterGame = nextState)
 
         if (RouterPuzzleEngine.isConnected(nextState)) {
+            routerCompleting = true
+            routerCountdownJob?.cancel()
             soundManager.playCircuitComplete()
-            solveRouterGame()
+            viewModelScope.launch {
+                delay(220)
+                solveRouterGame()
+            }
         }
     }
 
     private fun solveRouterGame() {
+        routerCompleting = false
         routerCountdownJob?.cancel()
         val game = _gameState.value.activeRouterGame ?: return
         addLog("FIREWALL SYNC SUCCESSFUL. NODE SECURED.", LogType.ACTION)
