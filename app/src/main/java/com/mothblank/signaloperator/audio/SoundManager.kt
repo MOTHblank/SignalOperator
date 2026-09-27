@@ -38,6 +38,7 @@ class SoundManager(private val context: Context) {
     private var clickSoundId = -1
     private var alertSoundId = -1
     @Volatile private var effectsEnabled = true
+    @Volatile private var hapticsEnabled = true
 
     private data class AudioParameters(
         val staticVolume: Float = 0.5f,
@@ -392,8 +393,16 @@ class SoundManager(private val context: Context) {
     }
 
     fun triggerHaptic(type: String) {
+        if (!hapticsEnabled) return
+
         val duration = when(type) {
-            "SCAN_NOTCH" -> 10L
+            "SCAN_NOTCH" -> 8L
+            "CARRIER_NEAR" -> 14L
+            "LOCK_ACQUIRED" -> 26L
+            "CALIBRATION_SYNC" -> 20L
+            "ROUTER_CONNECTED" -> 16L
+            "CONFIRM" -> 24L
+            "DISCARD" -> 18L
             "BUTTON_CLICK" -> 30L
             "ALARM" -> 60L
             else -> 0L
@@ -403,22 +412,48 @@ class SoundManager(private val context: Context) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val amplitude = when(type) {
-                    "SCAN_NOTCH" -> 60
+                    "SCAN_NOTCH" -> 45
+                    "CARRIER_NEAR" -> 85
+                    "LOCK_ACQUIRED" -> 165
+                    "CALIBRATION_SYNC" -> 135
+                    "ROUTER_CONNECTED" -> 115
+                    "CONFIRM" -> 150
+                    "DISCARD" -> 95
                     "BUTTON_CLICK" -> 120
                     "ALARM" -> 200
                     else -> VibrationEffect.DEFAULT_AMPLITUDE
                 }
-                if (type == "ALARM") {
-                    vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 30, 40, 30), intArrayOf(0, 180, 0, 180), -1))
-                } else {
-                    vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
+                when (type) {
+                    "ALARM" -> vibrator.vibrate(
+                        VibrationEffect.createWaveform(
+                            longArrayOf(0, 30, 40, 30),
+                            intArrayOf(0, 180, 0, 180),
+                            -1
+                        )
+                    )
+                    "LOCK_ACQUIRED" -> vibrator.vibrate(
+                        VibrationEffect.createWaveform(
+                            longArrayOf(0, 12, 22, 22),
+                            intArrayOf(0, 90, 0, 175),
+                            -1
+                        )
+                    )
+                    "CONFIRM" -> vibrator.vibrate(
+                        VibrationEffect.createWaveform(
+                            longArrayOf(0, 10, 18, 16),
+                            intArrayOf(0, 100, 0, 150),
+                            -1
+                        )
+                    )
+                    else -> vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
                 }
             } else {
                 @Suppress("DEPRECATION")
-                if (type == "ALARM") {
-                    vibrator.vibrate(longArrayOf(0, 30, 40, 30), -1)
-                } else {
-                    vibrator.vibrate(duration)
+                when (type) {
+                    "ALARM" -> vibrator.vibrate(longArrayOf(0, 30, 40, 30), -1)
+                    "LOCK_ACQUIRED" -> vibrator.vibrate(longArrayOf(0, 12, 22, 22), -1)
+                    "CONFIRM" -> vibrator.vibrate(longArrayOf(0, 10, 18, 16), -1)
+                    else -> vibrator.vibrate(duration)
                 }
             }
         } catch (e: Exception) {
@@ -428,6 +463,78 @@ class SoundManager(private val context: Context) {
 
     fun setEffectsEnabled(enabled: Boolean) {
         effectsEnabled = enabled
+    }
+
+    fun setHapticsEnabled(enabled: Boolean) {
+        hapticsEnabled = enabled
+    }
+
+    fun playScanNotch() {
+        triggerHaptic("SCAN_NOTCH")
+        if (effectsEnabled && clickSoundId != -1) {
+            soundPool.play(clickSoundId, 0.05f, 0.05f, 0, 0, 1.75f)
+        }
+    }
+
+    fun playCarrierNear() {
+        triggerHaptic("CARRIER_NEAR")
+        if (effectsEnabled && clickSoundId != -1) {
+            soundPool.play(clickSoundId, 0.10f, 0.10f, 1, 0, 1.45f)
+        }
+    }
+
+    fun playLockAcquired() {
+        triggerHaptic("LOCK_ACQUIRED")
+        if (effectsEnabled) {
+            if (clickSoundId != -1) {
+                soundPool.play(clickSoundId, 0.30f, 0.30f, 2, 0, 0.70f)
+            }
+            if (alertSoundId != -1) {
+                soundPool.play(alertSoundId, 0.08f, 0.08f, 1, 0, 0.75f)
+            }
+        }
+    }
+
+    fun playCalibrationSync() {
+        triggerHaptic("CALIBRATION_SYNC")
+        if (effectsEnabled && clickSoundId != -1) {
+            soundPool.play(clickSoundId, 0.22f, 0.22f, 2, 0, 1.85f)
+        }
+    }
+
+    fun playRouterTile(connectedNeighbors: Int) {
+        triggerHaptic(if (connectedNeighbors > 0) "ROUTER_CONNECTED" else "SCAN_NOTCH")
+        if (effectsEnabled && clickSoundId != -1) {
+            val volume = if (connectedNeighbors > 0) 0.22f else 0.10f
+            val rate = (1.0f + connectedNeighbors * 0.18f).coerceAtMost(1.7f)
+            soundPool.play(clickSoundId, volume, volume, 1, 0, rate)
+        }
+    }
+
+    fun playCircuitComplete() {
+        triggerHaptic("CONFIRM")
+        if (effectsEnabled) {
+            if (clickSoundId != -1) {
+                soundPool.play(clickSoundId, 0.42f, 0.42f, 2, 0, 1.8f)
+            }
+            if (alertSoundId != -1) {
+                soundPool.play(alertSoundId, 0.14f, 0.14f, 1, 0, 1.35f)
+            }
+        }
+    }
+
+    fun playCommit() {
+        triggerHaptic("CONFIRM")
+        if (effectsEnabled && clickSoundId != -1) {
+            soundPool.play(clickSoundId, 0.48f, 0.48f, 2, 0, 0.78f)
+        }
+    }
+
+    fun playDiscard() {
+        triggerHaptic("DISCARD")
+        if (effectsEnabled && clickSoundId != -1) {
+            soundPool.play(clickSoundId, 0.24f, 0.24f, 1, 0, 0.55f)
+        }
     }
 
     fun playClick() {
