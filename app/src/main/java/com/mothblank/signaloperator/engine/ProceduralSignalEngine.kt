@@ -3,6 +3,7 @@ package com.mothblank.signaloperator.engine
 import com.mothblank.signaloperator.models.GamePhase
 import com.mothblank.signaloperator.models.PuzzleType
 import com.mothblank.signaloperator.models.SignalData
+import com.mothblank.signaloperator.models.SignalKind
 import kotlin.random.Random
 
 data class SystemData(
@@ -76,6 +77,11 @@ class ProceduralSignalEngine {
         // Mundane signals appear more often on "Standard" frequencies (e.g. 88-108)
         val isMundane = !isInterviewOrEnding && frequency > 88.0f && frequency < 108.0f && random.nextFloat() < 0.4f
         val isDeadDrop = !isInterviewOrEnding && systemData != null && random.nextFloat() < 0.05f // 5% chance for a dead drop
+        val signalKind = when {
+            isDeadDrop -> SignalKind.DEAD_DROP
+            isMundane -> SignalKind.MUNDANE_BROADCAST
+            else -> SignalKind.MISSION
+        }
 
         // Select puzzle type based on phase
         var puzzleType = when(phase) {
@@ -95,7 +101,7 @@ class ProceduralSignalEngine {
         var metadata = ""
         var isAnomalous = false
 
-        if (isDeadDrop) {
+        if (signalKind == SignalKind.DEAD_DROP) {
             sender = deadDropSenders.random(random)
             val dropType = random.nextInt(3)
             rawMessage = when(dropType) {
@@ -109,7 +115,7 @@ class ProceduralSignalEngine {
             metadata = "TYPE: REAL-WORLD INTERCEPT | SOURCE: KERNEL"
             isAnomalous = true // Dead drops feel anomalous because they break the wall
             puzzleType = PuzzleType.OBSERVATION // Use observation as a simple interaction
-        } else if (isMundane) {
+        } else if (signalKind == SignalKind.MUNDANE_BROADCAST) {
             sender = mundaneSenders.random(random)
             rawMessage = mundaneReports.random(random)
             solution = "DISCARD" // Mundane signals are usually just noise
@@ -400,8 +406,10 @@ class ProceduralSignalEngine {
         }
         }
 
-        // Apply phase specific overrides
-        when (phase) {
+        // Phase decoration belongs only to mission signals. Special broadcasts keep
+        // the sender, anomaly status and metadata chosen by their generator.
+        if (signalKind == SignalKind.MISSION) {
+            when (phase) {
             GamePhase.APTITUDE_TEST -> {
                 sender = testSenders.random(random)
                 isAnomalous = false
@@ -462,7 +470,8 @@ class ProceduralSignalEngine {
                 objective = "RESPOND TO ENTITY"
                 metadata = "INTERVIEW_QUESTION|${qIndex}|${qChoices[qIndex]}"
             }
-            else -> {}
+                else -> {}
+            }
         }
 
         return SignalData(
@@ -477,7 +486,8 @@ class ProceduralSignalEngine {
             cipherType = cipherType,
             sender = sender,
             isAnomalous = isAnomalous,
-            metadata = metadata
+            metadata = metadata,
+            kind = signalKind
         )
     }
 }
