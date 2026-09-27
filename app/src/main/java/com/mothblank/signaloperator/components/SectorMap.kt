@@ -5,12 +5,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -18,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mothblank.signaloperator.models.*
@@ -35,6 +35,9 @@ fun SectorMap(
     onLocationClick: (Location) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var selectedLocationId by remember { mutableStateOf<String?>(null) }
+    val selectedLocation = locations.firstOrNull { it.id == selectedLocationId }
+
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
@@ -91,11 +94,21 @@ fun SectorMap(
             locations.forEach { loc ->
                 val nodeColor = nodeColor(loc.status, color)
                 val pressure = (loc.threat - loc.security).coerceAtLeast(0)
+                val center = Offset(loc.x * width, loc.y * height)
+
+                if (loc.id == selectedLocationId) {
+                    drawCircle(
+                        color = nodeColor.copy(alpha = 0.45f),
+                        radius = 16.dp.toPx(),
+                        center = center,
+                        style = Stroke(width = 2.dp.toPx())
+                    )
+                }
 
                 drawCircle(
                     color = nodeColor,
                     radius = 8.dp.toPx(),
-                    center = Offset(loc.x * width, loc.y * height),
+                    center = center,
                     style = Stroke(width = 2.dp.toPx())
                 )
 
@@ -103,7 +116,7 @@ fun SectorMap(
                     drawCircle(
                         color = nodeColor.copy(alpha = 0.2f),
                         radius = (12 + pressure / 8).dp.toPx(),
-                        center = Offset(loc.x * width, loc.y * height),
+                        center = center,
                         style = Stroke(width = 1.dp.toPx())
                     )
                 }
@@ -113,8 +126,9 @@ fun SectorMap(
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .background(Color.Black.copy(alpha = 0.82f))
-                .padding(6.dp)
+                .background(Color.Black.copy(alpha = 0.88f))
+                .border(1.dp, color.copy(alpha = 0.25f))
+                .padding(horizontal = 7.dp, vertical = 5.dp)
         ) {
             Text(
                 "NETWORK // CONTAINMENT $containmentIntegrity%",
@@ -124,7 +138,7 @@ fun SectorMap(
             )
             Text(
                 "EXPOSURE $exposure% // ECHO TRUST $trustInEcho% // SEC CHARGES $securityCharges",
-                color = color.copy(alpha = 0.75f),
+                color = color.copy(alpha = 0.72f),
                 fontFamily = FontFamily.Monospace,
                 fontSize = 9.sp
             )
@@ -132,22 +146,35 @@ fun SectorMap(
 
         locations.forEach { loc ->
             val nodeColor = nodeColor(loc.status, color)
+            val selected = loc.id == selectedLocationId
             Box(
                 modifier = Modifier
-                    .offset(x = widthDp * loc.x, y = heightDp * loc.y)
-                    .clickable { onLocationClick(loc) }
-                    .background(Color.Black.copy(alpha = 0.75f))
-                    .padding(3.dp)
+                    .offset(
+                        x = widthDp * loc.x - 55.dp,
+                        y = heightDp * loc.y - 22.dp
+                    )
+                    .width(110.dp)
+                    .clickable { selectedLocationId = loc.id }
+                    .background(Color.Black.copy(alpha = if (selected) 0.94f else 0.78f))
+                    .border(
+                        1.dp,
+                        if (selected) nodeColor else nodeColor.copy(alpha = 0.25f)
+                    )
+                    .padding(horizontal = 4.dp, vertical = 3.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text(
                         text = loc.name,
                         color = nodeColor,
-                        style = MaterialTheme.typography.labelSmall
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center
                     )
                     Text(
                         text = "SEC ${loc.security} / THR ${loc.threat}",
-                        color = nodeColor.copy(alpha = 0.75f),
+                        color = nodeColor.copy(alpha = 0.72f),
                         fontFamily = FontFamily.Monospace,
                         fontSize = 8.sp
                     )
@@ -155,21 +182,21 @@ fun SectorMap(
             }
         }
 
-        characters.forEach { char ->
-            val targetLoc = locations.find { it.id == char.locationId }
+        characters.forEach { character ->
+            val targetLoc = locations.find { it.id == character.locationId }
             if (targetLoc != null) {
                 val animX by animateFloatAsState(
                     targetValue = targetLoc.x,
-                    animationSpec = tween(durationMillis = 1600, easing = LinearEasing),
-                    label = "charX_${char.id}"
+                    animationSpec = tween(durationMillis = 1200, easing = LinearEasing),
+                    label = "charX_${character.id}"
                 )
                 val animY by animateFloatAsState(
                     targetValue = targetLoc.y,
-                    animationSpec = tween(durationMillis = 1600, easing = LinearEasing),
-                    label = "charY_${char.id}"
+                    animationSpec = tween(durationMillis = 1200, easing = LinearEasing),
+                    label = "charY_${character.id}"
                 )
 
-                val charColor = when (char.status) {
+                val charColor = when (character.status) {
                     CharacterStatus.ACTIVE -> color
                     CharacterStatus.MIA -> Color.Gray
                     CharacterStatus.COMPROMISED -> Color.Red
@@ -178,30 +205,108 @@ fun SectorMap(
 
                 Box(
                     modifier = Modifier
-                        .offset(x = widthDp * animX, y = (heightDp * animY) + 30.dp)
-                        .background(Color.Black.copy(alpha = 0.7f))
+                        .offset(
+                            x = widthDp * animX - 55.dp,
+                            y = heightDp * animY + 22.dp
+                        )
+                        .width(110.dp)
+                        .background(Color.Black.copy(alpha = 0.75f))
                         .padding(horizontal = 3.dp)
                 ) {
                     Text(
-                        text = "[${char.callsign}:${char.status.name}]",
+                        text = "[${character.callsign}:${character.status.name}]",
                         color = charColor,
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 8.sp
+                        fontSize = 8.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
         }
 
-        Text(
-            text = "TAP INVESTIGATING: FIREWALL // SECURE: REINFORCE (1) // CORRUPTED: RECOVER (2)",
-            color = color.copy(alpha = 0.6f),
-            fontFamily = FontFamily.Monospace,
-            fontSize = 8.sp,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .background(Color.Black.copy(alpha = 0.85f))
-                .padding(4.dp)
-        )
+        val selected = selectedLocation
+        if (selected != null) {
+            val actionLabel = when (selected.status) {
+                LocationStatus.SECURE -> "REINFORCE NODE // COST 1"
+                LocationStatus.INVESTIGATING -> "OPEN FIREWALL"
+                LocationStatus.CORRUPTED -> "BEGIN RECOVERY // COST 2"
+            }
+            val canAct = when (selected.status) {
+                LocationStatus.SECURE ->
+                    securityCharges >= 1 && !(selected.security >= 90 && selected.threat == 0)
+                LocationStatus.INVESTIGATING -> true
+                LocationStatus.CORRUPTED -> securityCharges >= 2
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.95f))
+                    .border(1.dp, nodeColor(selected.status, color))
+                    .padding(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        selected.name,
+                        color = nodeColor(selected.status, color),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        selected.status.name,
+                        color = nodeColor(selected.status, color),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "SECURITY ${selected.security}% // THREAT ${selected.threat}%",
+                    color = color.copy(alpha = 0.72f),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp
+                )
+                Spacer(Modifier.height(6.dp))
+                Button(
+                    onClick = { onLocationClick(selected) },
+                    enabled = canAct,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = nodeColor(selected.status, color),
+                        contentColor = Color.Black,
+                        disabledContainerColor = Color.DarkGray,
+                        disabledContentColor = Color.Gray
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(
+                        if (canAct) actionLabel else when (selected.status) {
+                            LocationStatus.SECURE -> "NODE ALREADY HARDENED"
+                            LocationStatus.CORRUPTED -> "INSUFFICIENT SECURITY CHARGES"
+                            else -> actionLabel
+                        },
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        } else {
+            Text(
+                text = "SELECT A NETWORK NODE FOR STATUS AND ACTIONS",
+                color = color.copy(alpha = 0.58f),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 8.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .background(Color.Black.copy(alpha = 0.88f))
+                    .padding(5.dp)
+            )
+        }
     }
 }
 
