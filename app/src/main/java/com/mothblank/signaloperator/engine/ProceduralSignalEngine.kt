@@ -478,6 +478,31 @@ class ProceduralSignalEngine {
             }
         }
 
+        val interaction = when {
+            signalKind == SignalKind.MUNDANE_BROADCAST -> PuzzleInteraction.MUNDANE_DISCARD
+            signalKind == SignalKind.DEAD_DROP && solution == "ACK" -> PuzzleInteraction.DEAD_DROP_ACK
+            signalKind == SignalKind.DEAD_DROP -> PuzzleInteraction.DEAD_DROP_BATTERY
+            phase == GamePhase.THE_INTERVIEW -> PuzzleInteraction.INTERVIEW_CHOICE
+            puzzleType == PuzzleType.CRYPTOGRAPHY -> PuzzleInteraction.TEXT_ENTRY
+            puzzleType == PuzzleType.SEQUENCE &&
+                solution in setOf("▲", "★", "●", "■") -> PuzzleInteraction.GLYPH_CHOICE
+            puzzleType == PuzzleType.SEQUENCE -> PuzzleInteraction.NUMBER_CHOICE
+            puzzleType == PuzzleType.LOGIC &&
+                solution in setOf("0", "1") -> PuzzleInteraction.BOOLEAN_CHOICE
+            puzzleType == PuzzleType.LOGIC &&
+                solution in setOf("A", "B", "C") -> PuzzleInteraction.TEMPORAL_CHOICE
+            puzzleType == PuzzleType.LOGIC -> PuzzleInteraction.DIRECTION_CHOICE
+            puzzleType == PuzzleType.OBSERVATION &&
+                metadata.startsWith("TYPE: HEX_DUMP") -> PuzzleInteraction.HEX_ADDRESS
+            puzzleType == PuzzleType.OBSERVATION &&
+                solution in setOf("TEMP", "VOLT", "CORE") -> PuzzleInteraction.ANOMALY_READOUT
+            puzzleType == PuzzleType.OBSERVATION &&
+                solution.all { it == 'A' || it == 'B' || it == 'C' || it == '1' || it == '2' || it == '3' } ->
+                PuzzleInteraction.COORDINATE_SEQUENCE
+            puzzleType == PuzzleType.OBSERVATION -> PuzzleInteraction.GLYPH_SEQUENCE
+            else -> PuzzleInteraction.TEXT_ENTRY
+        }
+
         val outcome = when (signalKind) {
             SignalKind.MISSION -> buildMissionOutcome(
                 phase = phase,
@@ -513,6 +538,7 @@ class ProceduralSignalEngine {
             isAnomalous = isAnomalous,
             metadata = metadata,
             kind = signalKind,
+            interaction = interaction,
             outcome = outcome
         )
     }
