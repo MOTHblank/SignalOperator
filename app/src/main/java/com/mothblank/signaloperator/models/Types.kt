@@ -23,6 +23,23 @@ enum class SignalKind {
     DEAD_DROP
 }
 
+enum class PuzzleInteraction {
+    TEXT_ENTRY,
+    NUMBER_CHOICE,
+    GLYPH_CHOICE,
+    BOOLEAN_CHOICE,
+    TEMPORAL_CHOICE,
+    DIRECTION_CHOICE,
+    INTERVIEW_CHOICE,
+    ANOMALY_READOUT,
+    HEX_ADDRESS,
+    COORDINATE_SEQUENCE,
+    GLYPH_SEQUENCE,
+    DEAD_DROP_ACK,
+    DEAD_DROP_BATTERY,
+    MUNDANE_DISCARD
+}
+
 enum class Urgency {
     ROUTINE,
     ELEVATED,
@@ -75,6 +92,7 @@ data class SignalData(
     val isAnomalous: Boolean,
     val metadata: String,
     val kind: SignalKind = SignalKind.MISSION,
+    val interaction: PuzzleInteraction = PuzzleInteraction.TEXT_ENTRY,
     val outcome: SignalOutcome? = null
 )
 
