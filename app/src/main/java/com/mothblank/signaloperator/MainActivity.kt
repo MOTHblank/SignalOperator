@@ -104,9 +104,13 @@ class MainActivity : ComponentActivity() {
             }
 
             val currentColor = when (gameState.phase) {
-                GamePhase.ACTIVE_INVESTIGATION -> CrtAmber
-                GamePhase.THE_INTERVIEW        -> CrtRed
-                else                           -> CrtGreen
+                GamePhase.ACTIVE_INVESTIGATION,
+                GamePhase.ENDING_CONTAINMENT -> CrtAmber
+
+                GamePhase.THE_INTERVIEW,
+                GamePhase.ENDING_COMPLIANCE -> CrtRed
+
+                else -> CrtGreen
             }
 
             var baseModifier = Modifier.fillMaxSize()
