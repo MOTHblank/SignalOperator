@@ -15,22 +15,33 @@ object RouterPuzzleEngine {
         val random = Random(seed)
         val tilePaths = TilePath.entries
         val rotations = listOf(0, 90, 180, 270)
+        val center = size / 2
         val tiles = buildList {
             for (x in 0 until size) {
                 for (y in 0 until size) {
+                    val isGuaranteedRoute = y == center
                     add(
                         RouterTile(
                             x = x,
                             y = y,
-                            type = tilePaths.random(random),
-                            rotationDegrees = rotations.random(random)
+                            type = if (isGuaranteedRoute) {
+                                TilePath.STRAIGHT
+                            } else {
+                                tilePaths.random(random)
+                            },
+                            rotationDegrees = if (isGuaranteedRoute && x == 0) {
+                                // Force the generated board to start unsolved. Rotating
+                                // every route tile to 0 degrees always restores a path.
+                                90
+                            } else {
+                                rotations.random(random)
+                            }
                         )
                     )
                 }
             }
         }
 
-        val center = size / 2
         return RouterGameState(
             locationId = locationId,
             grid = tiles,
