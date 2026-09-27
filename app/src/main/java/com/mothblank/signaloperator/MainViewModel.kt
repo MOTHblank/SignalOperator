@@ -71,6 +71,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val KEY_CRT = "crt_enabled"
     private val KEY_SOUND = "sound_enabled"
     private val KEY_TTS = "tts_enabled"
+    private val KEY_HAPTICS = "haptics_enabled"
 
     private val PREFS_HIGHSCORES = "signal_operator_highscores"
     private val KEY_HIGHSCORES = "highscores"
@@ -157,6 +158,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     init {
         loadSettings()
         soundManager.setEffectsEnabled(_gameState.value.isSoundEnabled)
+        soundManager.setHapticsEnabled(_gameState.value.isHapticsEnabled)
         val saved = SaveStateManager.loadGame(application)
         _hasSavedGame.value = saved != null
 
@@ -165,6 +167,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 isCrtEffectEnabled = _gameState.value.isCrtEffectEnabled,
                 isSoundEnabled = _gameState.value.isSoundEnabled,
                 isTtsEnabled = _gameState.value.isTtsEnabled,
+                isHapticsEnabled = _gameState.value.isHapticsEnabled,
                 isInMenu = true,
                 activeRouterGame = null,
                 selectedLogEntry = null,
@@ -216,10 +219,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val crt = prefs.getBoolean(KEY_CRT, true)
         val sound = prefs.getBoolean(KEY_SOUND, true)
         val tts = prefs.getBoolean(KEY_TTS, true)
+        val haptics = prefs.getBoolean(KEY_HAPTICS, true)
         _gameState.value = _gameState.value.copy(
             isCrtEffectEnabled = crt,
             isSoundEnabled = sound,
             isTtsEnabled = tts,
+            isHapticsEnabled = haptics,
             isInMenu = true
         )
     }
@@ -309,6 +314,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun toggleHaptics() {
+        val newVal = !_gameState.value.isHapticsEnabled
+        _gameState.value = _gameState.value.copy(isHapticsEnabled = newVal)
+        soundManager.setHapticsEnabled(newVal)
+        saveSetting(KEY_HAPTICS, newVal)
+    }
+
     fun playClick() {
         soundManager.playClick()
     }
@@ -348,9 +360,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentMenuScreen = MenuSubScreen.OPTIONS,
             isCrtEffectEnabled = true,
             isSoundEnabled = true,
-            isTtsEnabled = true
+            isTtsEnabled = true,
+            isHapticsEnabled = true
         )
         soundManager.setEffectsEnabled(true)
+        soundManager.setHapticsEnabled(true)
         initializeWorld()
         generateHotspots(_gameState.value.phase, _gameState.value.seed, _gameState.value.puzzlesRequired)
 
@@ -376,7 +390,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             currentMenuScreen = MenuSubScreen.MAIN,
             isCrtEffectEnabled = settings.isCrtEffectEnabled,
             isSoundEnabled = settings.isSoundEnabled,
-            isTtsEnabled = settings.isTtsEnabled
+            isTtsEnabled = settings.isTtsEnabled,
+            isHapticsEnabled = settings.isHapticsEnabled
         )
         initializeWorld()
         generateHotspots(GamePhase.APTITUDE_TEST, _gameState.value.seed, _gameState.value.puzzlesRequired)
