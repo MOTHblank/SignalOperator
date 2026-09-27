@@ -17,7 +17,8 @@ data class SignalRequest(
     val frequency: Float,
     val seed: Long,
     val systemData: SystemData? = null,
-    val solvedPuzzlesCount: Int = 0
+    val solvedPuzzlesCount: Int = 0,
+    val requestedKind: SignalKind? = null
 )
 
 class ProceduralSignalEngine {
@@ -77,11 +78,13 @@ class ProceduralSignalEngine {
         // Mundane signals appear more often on "Standard" frequencies (e.g. 88-108)
         val isMundane = !isInterviewOrEnding && frequency > 88.0f && frequency < 108.0f && random.nextFloat() < 0.4f
         val isDeadDrop = !isInterviewOrEnding && systemData != null && random.nextFloat() < 0.05f // 5% chance for a dead drop
-        val signalKind = when {
-            isDeadDrop -> SignalKind.DEAD_DROP
-            isMundane -> SignalKind.MUNDANE_BROADCAST
-            else -> SignalKind.MISSION
-        }
+        val signalKind = request.requestedKind
+            ?.takeUnless { it == SignalKind.DEAD_DROP && systemData == null }
+            ?: when {
+                isDeadDrop -> SignalKind.DEAD_DROP
+                isMundane -> SignalKind.MUNDANE_BROADCAST
+                else -> SignalKind.MISSION
+            }
 
         // Select puzzle type based on phase
         var puzzleType = when(phase) {
@@ -102,14 +105,17 @@ class ProceduralSignalEngine {
         var isAnomalous = false
 
         if (signalKind == SignalKind.DEAD_DROP) {
+            val telemetry = requireNotNull(systemData) {
+                "Dead-drop generation requires system telemetry"
+            }
             sender = deadDropSenders.random(random)
             val dropType = random.nextInt(3)
             rawMessage = when(dropType) {
-                0 -> "HARDWARE INTERCEPT: ${systemData.deviceModel} DETECTED. TEMPERATURE STABLE."
-                1 -> "POWER GRID MONITOR: LOCAL CELL VOLTAGE AT ${systemData.batteryLevel}%."
-                else -> "TIME SYNC SUCCESS: LOCAL CLOCK READS ${systemData.currentTime}."
+                0 -> "HARDWARE INTERCEPT: ${telemetry.deviceModel} DETECTED. TEMPERATURE STABLE."
+                1 -> "POWER GRID MONITOR: LOCAL CELL VOLTAGE AT ${telemetry.batteryLevel}%."
+                else -> "TIME SYNC SUCCESS: LOCAL CLOCK READS ${telemetry.currentTime}."
             }
-            solution = if (dropType == 1) systemData.batteryLevel.toString() else "ACK"
+            solution = if (dropType == 1) telemetry.batteryLevel.toString() else "ACK"
             encodedMessage = rawMessage
             objective = "VERIFY SYSTEM TELEMETRY"
             metadata = "TYPE: REAL-WORLD INTERCEPT | SOURCE: KERNEL"
