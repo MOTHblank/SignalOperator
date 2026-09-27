@@ -146,6 +146,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var activeSignalFrequency: Float? = null
     private var hardwareFailureJob: Job? = null
     private var radioLoopJob: Job? = null
+    private var bootJob: Job? = null
     private var minHotspotDistance = 100f
     private var breachMonitorJob: Job? = null
     private var lastFrequencyNotch = -1
@@ -350,6 +351,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         SaveStateManager.clearSave(getApplication())
         _hasSavedGame.value = false
+        bootJob?.cancel()
+        bootJob = null
+        _bootStep.value = null
         stopRadioLoop()
         routerCountdownJob?.cancel()
 
@@ -463,6 +467,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun returnToMenu() {
+        bootJob?.cancel()
+        bootJob = null
+        _bootStep.value = null
         stopRadioLoop()
         routerCountdownJob?.cancel()
         _gameState.value = _gameState.value.copy(
@@ -809,13 +816,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun runBootSequence(onComplete: () -> Unit) {
-        viewModelScope.launch {
-            for (step in 0..3) {
-                _bootStep.value = step
-                delay(if (step == 3) 180L else 210L)
+        bootJob?.cancel()
+        bootJob = viewModelScope.launch {
+            try {
+                for (step in 0..3) {
+                    _bootStep.value = step
+                    delay(if (step == 3) 180L else 210L)
+                }
+                _bootStep.value = null
+                if (isRuntimeActive()) {
+                    onComplete()
+                }
+            } finally {
+                _bootStep.value = null
+                bootJob = null
             }
-            _bootStep.value = null
-            onComplete()
         }
     }
 
