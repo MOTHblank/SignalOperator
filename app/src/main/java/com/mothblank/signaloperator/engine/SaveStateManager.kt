@@ -9,7 +9,7 @@ import org.json.JSONObject
 object SaveStateManager {
     private const val PREFS_NAME = "signal_operator_save_state"
     private const val KEY_SAVE_DATA = "save_data"
-    private const val CURRENT_SCHEMA_VERSION = 2
+    private const val CURRENT_SCHEMA_VERSION = 3
 
     data class SavedData(
         val gameState: GameState,
@@ -39,6 +39,14 @@ object SaveStateManager {
             json.put("puzzlesSolved", state.puzzlesSolved)
             json.put("puzzlesRequired", state.puzzlesRequired)
             json.put("seed", state.seed)
+            json.put("trustInEcho", state.trustInEcho)
+            json.put("exposure", state.exposure)
+            json.put("containmentIntegrity", state.containmentIntegrity)
+            json.put("securityCharges", state.securityCharges)
+            json.put("deadDropsRecovered", state.deadDropsRecovered)
+            json.put("routineBroadcastsCleared", state.routineBroadcastsCleared)
+            json.put("breachesPrevented", state.breachesPrevented)
+            json.put("endingSummary", state.endingSummary ?: JSONObject.NULL)
 
             // Hotspots
             val hotspotsArray = JSONArray()
@@ -54,6 +62,8 @@ object SaveStateManager {
                 locObj.put("x", loc.x.toDouble())
                 locObj.put("y", loc.y.toDouble())
                 locObj.put("status", loc.status.name)
+                locObj.put("security", loc.security)
+                locObj.put("threat", loc.threat)
                 locationsArray.put(locObj)
             }
             json.put("locations", locationsArray)
@@ -69,6 +79,17 @@ object SaveStateManager {
                 charactersArray.put(charObj)
             }
             json.put("characters", charactersArray)
+
+            val linksArray = JSONArray()
+            state.networkLinks.forEach { link ->
+                val linkObj = JSONObject()
+                linkObj.put("id", link.id)
+                linkObj.put("fromLocationId", link.fromLocationId)
+                linkObj.put("toLocationId", link.toLocationId)
+                linkObj.put("status", link.status.name)
+                linksArray.put(linkObj)
+            }
+            json.put("networkLinks", linksArray)
 
             // Logs
             val logsArray = JSONArray()
@@ -107,6 +128,14 @@ object SaveStateManager {
             val puzzlesSolved = json.getInt("puzzlesSolved")
             val puzzlesRequired = json.getInt("puzzlesRequired")
             val seed = json.getLong("seed")
+            val trustInEcho = json.optInt("trustInEcho", 50)
+            val exposure = json.optInt("exposure", 0)
+            val containmentIntegrity = json.optInt("containmentIntegrity", 100)
+            val securityCharges = json.optInt("securityCharges", 1)
+            val deadDropsRecovered = json.optInt("deadDropsRecovered", 0)
+            val routineBroadcastsCleared = json.optInt("routineBroadcastsCleared", 0)
+            val breachesPrevented = json.optInt("breachesPrevented", 0)
+            val endingSummary = if (json.isNull("endingSummary")) null else json.optString("endingSummary", null)
 
             // Hotspots
             val solvedHotspots = mutableSetOf<Float>()
@@ -125,7 +154,9 @@ object SaveStateManager {
                     name = locObj.getString("name"),
                     x = locObj.getDouble("x").toFloat(),
                     y = locObj.getDouble("y").toFloat(),
-                    status = LocationStatus.valueOf(locObj.getString("status"))
+                    status = LocationStatus.valueOf(locObj.getString("status")),
+                    security = locObj.optInt("security", 50),
+                    threat = locObj.optInt("threat", 0)
                 ))
             }
 
@@ -141,6 +172,31 @@ object SaveStateManager {
                     locationId = locationId,
                     status = CharacterStatus.valueOf(charObj.getString("status"))
                 ))
+            }
+
+            val networkLinks = mutableListOf<NetworkLink>()
+            val linksArray = json.optJSONArray("networkLinks")
+            if (linksArray != null) {
+                for (i in 0 until linksArray.length()) {
+                    val linkObj = linksArray.getJSONObject(i)
+                    networkLinks.add(
+                        NetworkLink(
+                            id = linkObj.getString("id"),
+                            fromLocationId = linkObj.getString("fromLocationId"),
+                            toLocationId = linkObj.getString("toLocationId"),
+                            status = LinkStatus.valueOf(linkObj.optString("status", LinkStatus.ACTIVE.name))
+                        )
+                    )
+                }
+            } else {
+                networkLinks.addAll(
+                    listOf(
+                        NetworkLink("link-1", "loc-1", "loc-2"),
+                        NetworkLink("link-2", "loc-2", "loc-3"),
+                        NetworkLink("link-3", "loc-2", "loc-4"),
+                        NetworkLink("link-4", "loc-1", "loc-3")
+                    )
+                )
             }
 
             // Logs
@@ -167,6 +223,15 @@ object SaveStateManager {
                 solvedHotspots = solvedHotspots,
                 locations = locations,
                 characters = characters,
+                networkLinks = networkLinks,
+                trustInEcho = trustInEcho,
+                exposure = exposure,
+                containmentIntegrity = containmentIntegrity,
+                securityCharges = securityCharges,
+                deadDropsRecovered = deadDropsRecovered,
+                routineBroadcastsCleared = routineBroadcastsCleared,
+                breachesPrevented = breachesPrevented,
+                endingSummary = endingSummary,
                 isMapViewActive = false,
                 activeRouterGame = null,
                 selectedLogEntry = null,
