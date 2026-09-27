@@ -8,6 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.mothblank.signaloperator.models.PuzzleType
+import com.mothblank.signaloperator.models.PuzzleInteraction
 import com.mothblank.signaloperator.models.SignalData
 import com.mothblank.signaloperator.models.SignalKind
 import com.mothblank.signaloperator.models.Urgency
@@ -76,7 +77,7 @@ fun getDecoderHint(
             }
         }
         PuzzleType.SEQUENCE -> {
-            val isGlyphSequence = signal.solution == "▲" || signal.solution == "★" || signal.solution == "●" || signal.solution == "■"
+            val isGlyphSequence = signal.interaction == PuzzleInteraction.GLYPH_CHOICE
             if (isGlyphSequence) {
                 Pair(
                     "ANALYSIS: GLYPH SEQUENCE",
@@ -90,9 +91,9 @@ fun getDecoderHint(
             }
         }
         PuzzleType.LOGIC -> {
-            val isBoolean = signal.solution == "0" || signal.solution == "1"
-            val isTemporal = signal.solution == "A" || signal.solution == "B" || signal.solution == "C"
-            val isInterview = signal.metadata.startsWith("INTERVIEW_QUESTION")
+            val isBoolean = signal.interaction == PuzzleInteraction.BOOLEAN_CHOICE
+            val isTemporal = signal.interaction == PuzzleInteraction.TEMPORAL_CHOICE
+            val isInterview = signal.interaction == PuzzleInteraction.INTERVIEW_CHOICE
             
             if (isInterview) {
                 Pair(
@@ -117,10 +118,11 @@ fun getDecoderHint(
             }
         }
         PuzzleType.OBSERVATION -> {
-            val isAnomaly = signal.solution == "TEMP" || signal.solution == "VOLT" || signal.solution == "CORE"
-            val isHexDump = signal.metadata.startsWith("TYPE: HEX_DUMP")
-            val isDeadDrop = signal.metadata.startsWith("TYPE: REAL-WORLD INTERCEPT")
-            val isMundane = signal.solution == "DISCARD"
+            val isAnomaly = signal.interaction == PuzzleInteraction.ANOMALY_READOUT
+            val isHexDump = signal.interaction == PuzzleInteraction.HEX_ADDRESS
+            val isDeadDrop = signal.interaction == PuzzleInteraction.DEAD_DROP_ACK ||
+                        signal.interaction == PuzzleInteraction.DEAD_DROP_BATTERY
+            val isMundane = signal.interaction == PuzzleInteraction.MUNDANE_DISCARD
             
             if (isMundane) {
                 Pair(
@@ -363,7 +365,7 @@ fun Decoder(
                 }
 
 
-                val isInterview = signal.metadata.startsWith("INTERVIEW_QUESTION")
+                val isInterview = signal.interaction == PuzzleInteraction.INTERVIEW_CHOICE
 
                 if (isInterview) {
                     Column {
@@ -405,8 +407,8 @@ fun Decoder(
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else if (signal.puzzleType == PuzzleType.LOGIC) {
-                    val isBoolean = signal.solution == "0" || signal.solution == "1"
-                    val isTemporal = signal.solution == "A" || signal.solution == "B" || signal.solution == "C"
+                    val isBoolean = signal.interaction == PuzzleInteraction.BOOLEAN_CHOICE
+                    val isTemporal = signal.interaction == PuzzleInteraction.TEMPORAL_CHOICE
                     
                     Column {
                         if (isBoolean) {
@@ -536,11 +538,12 @@ fun Decoder(
                         }
                     }
                 } else if (signal.puzzleType == PuzzleType.OBSERVATION) {
-                    val isAnomaly = signal.solution == "TEMP" || signal.solution == "VOLT" || signal.solution == "CORE"
-                    val isHexDump = signal.metadata.startsWith("TYPE: HEX_DUMP")
-                    val isDeadDrop = signal.metadata.startsWith("TYPE: REAL-WORLD INTERCEPT")
-                    val isMundane = signal.solution == "DISCARD"
-                    val isCoordinate = !isAnomaly && !isHexDump && !isDeadDrop && !isMundane && signal.solution.all { it == 'A' || it == 'B' || it == 'C' || it == '1' || it == '2' || it == '3' }
+                    val isAnomaly = signal.interaction == PuzzleInteraction.ANOMALY_READOUT
+                    val isHexDump = signal.interaction == PuzzleInteraction.HEX_ADDRESS
+                    val isDeadDrop = signal.interaction == PuzzleInteraction.DEAD_DROP_ACK ||
+                        signal.interaction == PuzzleInteraction.DEAD_DROP_BATTERY
+                    val isMundane = signal.interaction == PuzzleInteraction.MUNDANE_DISCARD
+                    val isCoordinate = signal.interaction == PuzzleInteraction.COORDINATE_SEQUENCE
                     
                     Column {
                         if (isMundane) {
@@ -765,7 +768,7 @@ fun Decoder(
                     }
                 }
                 
-                val isMatch = if (signal.metadata.startsWith("INTERVIEW_QUESTION")) {
+                val isMatch = if (signal.interaction == PuzzleInteraction.INTERVIEW_CHOICE) {
                     signal.solution.split("|").any { it.trim().equals(input.trim(), ignoreCase = true) }
                 } else if (signal.puzzleType == PuzzleType.CRYPTOGRAPHY) {
                     input.filter { it.isLetter() }.equals(signal.solution.filter { it.isLetter() }, ignoreCase = true)
