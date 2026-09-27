@@ -522,7 +522,9 @@ fun HelpLayout(
             HelpSection("01. SIGNAL ACQUISITION", "Turn the large FREQUENCY tuner (88-108 MHz) to scan for radio anomalies. Intercept locks automatically trigger the decoding terminal.", color)
             HelpSection("02. OSCILLOSCOPE CALIBRATION", "Use GAIN and FILTER sliders to match the solid active wave with the dotted reference wave. Achieving 95% stability is required to decrypt telemetry packet buffers.", color)
             HelpSection("03. CYPHER RESOLUTION", "Use the decoder keyboard to translate raw streams. Puzzles shift dynamically based on seed conditions.", color)
-            HelpSection("04. SECTOR NETWORK", "Toggle map coordinates to observe character activity and site security indexes. Corrupted sites force logic firewalls that must be resolved.", color)
+            HelpSection("04. SECTOR NETWORK", "The map is operational, not decorative. Decoded mission traffic raises THREAT on specific nodes. Tap INVESTIGATING nodes to resolve firewall breaches, tap SECURE nodes to spend one reinforcement charge, and spend two charges to reopen a CORRUPTED node.", color)
+            HelpSection("05. SPECTRUM MEMORY", "Every acquired carrier is remembered on the frequency scale. Mission traffic, public stations, and kernel dead drops use different markers. Familiar frequencies persisting across phase changes are intentional clues.", color)
+            HelpSection("06. RUN CONSEQUENCES", "Archiving or ignoring mission traffic changes ECHO trust, exposure, containment integrity, agent status, and the final outcome. The last interview response is interpreted against the network state you created.", color)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
