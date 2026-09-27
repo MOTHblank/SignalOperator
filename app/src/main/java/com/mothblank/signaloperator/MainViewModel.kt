@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.mothblank.signaloperator.audio.AndroidTextToSpeech
 import com.mothblank.signaloperator.audio.SoundManager
 import com.mothblank.signaloperator.audio.TextToSpeechEngine
+import com.mothblank.signaloperator.engine.DialogueCue
+import com.mothblank.signaloperator.engine.GameSessionReducer
 import com.mothblank.signaloperator.engine.HotspotPlanner
 import com.mothblank.signaloperator.engine.ProceduralSignalEngine
 import com.mothblank.signaloperator.engine.SaveStateManager
@@ -784,156 +786,74 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             addLog("TRANSMISSION SUCCESSFUL. INTEL LOGGED.", LogType.ACTION)
             if (current.phase != GamePhase.THE_INTERVIEW) {
                 addLog("DECODED: ${signal.solution.uppercase()}", LogType.SYSTEM)
+                addLog(
+                    "PROGRESS: ${current.puzzlesSolved + 1} / ${current.puzzlesRequired} INTEL RECOVERED.",
+                    LogType.SYSTEM
+                )
             } else {
                 addLog("TRANSMITTED: ${solutionInput.uppercase()}", LogType.SYSTEM)
+                addLog(
+                    "ASSESSMENT PROGRESS: ${current.puzzlesSolved + 1} / ${current.puzzlesRequired}",
+                    LogType.SYSTEM
+                )
             }
         } else {
             addLog("SIGNAL DISCARDED.", LogType.ACTION)
         }
         stopRadioLoop()
 
-        var archived = current.archivedSignals
-        var ignored = current.ignoredSignals
-        var solved = current.puzzlesSolved
-        val solvedHotspots = current.solvedHotspots.toMutableSet()
-        var locations = current.locations
-        var characters = current.characters
+        val resolution = GameSessionReducer.resolveProcessedSignal(
+            current = current,
+            signal = signal,
+            currentHotspot = currentHotspot,
+            action = action,
+            solutionInput = solutionInput
+        )
+        val nextState = resolution.state
+        _gameState.value = nextState
 
-        if (action == "COMMIT") {
-            archived += 1
-            solved += 1
-            solvedHotspots.add(currentHotspot)
-
-            if (current.phase != GamePhase.THE_INTERVIEW) {
-                addLog("PROGRESS: $solved / ${current.puzzlesRequired} INTEL RECOVERED.", LogType.SYSTEM)
-            } else {
-                addLog("ASSESSMENT PROGRESS: $solved / ${current.puzzlesRequired}", LogType.SYSTEM)
+        when (resolution.dialogueCue) {
+            DialogueCue.LIVE_INTRUSION -> {
+                addLog("LOCAL BUFFER PURGED. OVERRIDE DETECTED FROM EXTERNAL NODE.", LogType.ERROR)
+                triggerDialogue(getLiveIntrusionDialogue())
             }
-
-            val updatedLocations = current.locations.toMutableList()
-            val searchText = "${signal.solution} ${signal.encodedMessage}".uppercase()
-            val targetLoc = when {
-                searchText.contains("SITE ALPHA") -> updatedLocations.find { it.name == "SITE ALPHA" }
-                searchText.contains("SECTOR 4") -> updatedLocations.find { it.name == "SECTOR 4 RELAY" }
-                searchText.contains("OUTPOST") -> updatedLocations.find { it.name == "ALPHA OUTPOST" }
-                else -> null
+            DialogueCue.ACTIVE_INVESTIGATION -> {
+                addLog("SIGNAL INDUCED COGNITIVE DISTORTION DETECTED. NEURAL LINK COMPROMISED.", LogType.ERROR)
+                triggerDialogue(getActiveInvestigationDialogue())
             }
-
-            if (targetLoc != null) {
-                val index = updatedLocations.indexOf(targetLoc)
-                updatedLocations[index] = targetLoc.copy(status = LocationStatus.INVESTIGATING)
+            DialogueCue.THE_INTERVIEW -> {
+                addLog("CRITICAL: DIRECT COGNITIVE ASSESSMENT INITIALIZED. RESPOND.", LogType.ERROR)
+                triggerDialogue(getTheInterviewDialogue())
             }
-
-            val updatedCharacters = current.characters.toMutableList()
-            if (updatedCharacters.isNotEmpty() && updatedLocations.isNotEmpty() && Random.nextFloat() < 0.5f) {
-                val charIndex = Random.nextInt(updatedCharacters.size)
-                val randomLoc = updatedLocations.random()
-                updatedCharacters[charIndex] = updatedCharacters[charIndex].copy(locationId = randomLoc.id)
-            }
-
-            locations = updatedLocations
-            characters = updatedCharacters
-        } else {
-            ignored += 1
-            if (signal.solution == "DISCARD") {
-                solvedHotspots.add(currentHotspot)
-            }
+            null -> Unit
         }
 
-        var nextPhase = current.phase
-        var corruption = current.corruptionLevel
-        var required = current.puzzlesRequired
-        var dialogueToTrigger: List<DialogueLine>? = null
-
-        if (solved >= current.puzzlesRequired) {
-            when (current.phase) {
-                GamePhase.APTITUDE_TEST -> {
-                    nextPhase = GamePhase.LIVE_INTRUSION
-                    required = 5
-                    solved = 0
-                    solvedHotspots.clear()
-                    addLog("LOCAL BUFFER PURGED. OVERRIDE DETECTED FROM EXTERNAL NODE.", LogType.ERROR)
-                    dialogueToTrigger = getLiveIntrusionDialogue()
+        if (current.phase == GamePhase.THE_INTERVIEW && isEndingPhase(nextState.phase)) {
+            when (nextState.phase) {
+                GamePhase.ENDING_COMPLIANCE -> {
+                    addLog("INTEGRATION INITIALIZED.", LogType.SYSTEM)
+                    addLog("PHYSICAL BOUNDARIES SEVERED.", LogType.SYSTEM)
+                    addLog("YOU ARE HOME.", LogType.SYSTEM)
                 }
-                GamePhase.LIVE_INTRUSION -> {
-                    nextPhase = GamePhase.ACTIVE_INVESTIGATION
-                    required = 6
-                    solved = 0
-                    solvedHotspots.clear()
-                    corruption = 1f
-                    addLog("SIGNAL INDUCED COGNITIVE DISTORTION DETECTED. NEURAL LINK COMPROMISED.", LogType.ERROR)
-                    dialogueToTrigger = getActiveInvestigationDialogue()
+                GamePhase.ENDING_SEVERED -> {
+                    addLog("CONNECTION TERMINATED BY CLIENT.", LogType.ERROR)
+                    addLog("NEURAL INTERFACE OFFLINE.", LogType.ERROR)
+                    addLog("STATIC REMAINS.", LogType.ERROR)
                 }
-                GamePhase.ACTIVE_INVESTIGATION -> {
-                    nextPhase = GamePhase.THE_INTERVIEW
-                    required = 3
-                    solved = 0
-                    solvedHotspots.clear()
-                    corruption = 2f
-                    addLog("CRITICAL: DIRECT COGNITIVE ASSESSMENT INITIALIZED. RESPOND.", LogType.ERROR)
-                    dialogueToTrigger = getTheInterviewDialogue()
-                }
-                GamePhase.THE_INTERVIEW -> {
-                    nextPhase = when (solutionInput.uppercase().trim()) {
-                        "I ACCEPT" -> GamePhase.ENDING_COMPLIANCE
-                        "I REFUSE" -> GamePhase.ENDING_SEVERED
-                        else -> GamePhase.ENDING_CONTAINMENT
-                    }
-                    solved = 0
-                    solvedHotspots.clear()
-
-                    when (nextPhase) {
-                        GamePhase.ENDING_COMPLIANCE -> {
-                            addLog("INTEGRATION INITIALIZED.", LogType.SYSTEM)
-                            addLog("PHYSICAL BOUNDARIES SEVERED.", LogType.SYSTEM)
-                            addLog("YOU ARE HOME.", LogType.SYSTEM)
-                        }
-                        GamePhase.ENDING_SEVERED -> {
-                            addLog("CONNECTION TERMINATED BY CLIENT.", LogType.ERROR)
-                            addLog("NEURAL INTERFACE OFFLINE.", LogType.ERROR)
-                            addLog("STATIC REMAINS.", LogType.ERROR)
-                        }
-                        GamePhase.ENDING_CONTAINMENT -> {
-                            addLog("CRITICAL CONTAINER LEAK.", LogType.ERROR)
-                            addLog("FLESH CORRUPTION AT 100%.", LogType.ERROR)
-                            addLog("THE TERMINAL SEES YOU.", LogType.ERROR)
-                        }
-                        else -> Unit
-                    }
-
-                    val finalScore = (archived * 1000 - ignored * 200).coerceAtLeast(0)
-                    val opId = "OP-${current.seed % 1000}"
-                    saveHighScore(
-                        HighScoreEntry(
-                            operatorId = opId,
-                            maxPhase = nextPhase.name.replace("ENDING_", ""),
-                            intelSaved = archived,
-                            score = finalScore
-                        )
-                    )
+                GamePhase.ENDING_CONTAINMENT -> {
+                    addLog("CRITICAL CONTAINER LEAK.", LogType.ERROR)
+                    addLog("FLESH CORRUPTION AT 100%.", LogType.ERROR)
+                    addLog("THE TERMINAL SEES YOU.", LogType.ERROR)
                 }
                 else -> Unit
             }
         }
 
-        val nextState = current.copy(
-            phase = nextPhase,
-            corruptionLevel = corruption,
-            archivedSignals = archived,
-            ignoredSignals = ignored,
-            puzzlesSolved = solved,
-            puzzlesRequired = required,
-            solvedHotspots = solvedHotspots,
-            locations = locations,
-            characters = characters,
-            downloadProgress = 0f
-        )
-        _gameState.value = nextState
+        resolution.highScore?.let(::saveHighScore)
 
-        if (nextPhase != current.phase && !isEndingPhase(nextPhase)) {
-            generateHotspots(nextPhase, nextState.seed)
+        if (nextState.phase != current.phase && !isEndingPhase(nextState.phase)) {
+            generateHotspots(nextState.phase, nextState.seed)
         }
-        dialogueToTrigger?.let(::triggerDialogue)
 
         _activeSignal.value = null
         lockedHotspot = null
