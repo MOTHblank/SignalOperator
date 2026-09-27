@@ -474,6 +474,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     state.activeRouterGame == null &&
                     activeSignalValue == null &&
                     _activeDialogue.value == null &&
+                    state.selectedLogEntry == null &&
                     (state.phase == GamePhase.ACTIVE_INVESTIGATION || state.phase == GamePhase.THE_INTERVIEW)) {
                     val breachCandidates = state.locations
                         .filter {
