@@ -9,6 +9,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.mothblank.signaloperator.models.PuzzleType
 import com.mothblank.signaloperator.models.SignalData
+import com.mothblank.signaloperator.models.SignalKind
+import com.mothblank.signaloperator.models.Urgency
 import kotlinx.coroutines.delay
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -285,6 +287,40 @@ fun Decoder(
                     if (isGlyphSequence) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text("KEY MATRIX: ${signal.metadata}", color = color.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                signal.outcome?.let { outcome ->
+                    val urgencyColor = when (outcome.urgency) {
+                        Urgency.ROUTINE -> color.copy(alpha = 0.7f)
+                        Urgency.ELEVATED -> color
+                        Urgency.HIGH -> Color.Yellow
+                        Urgency.CRITICAL -> CrtRed
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, urgencyColor.copy(alpha = 0.55f))
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            "FIELD ANALYSIS // ${outcome.urgency.name}",
+                            color = urgencyColor,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        Text(
+                            outcome.briefing,
+                            color = color.copy(alpha = 0.82f),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        outcome.locationId?.let {
+                            Text(
+                                "NETWORK TARGET: $it",
+                                color = color.copy(alpha = 0.6f),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
                     }
                 }
 
@@ -704,17 +740,28 @@ fun Decoder(
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = { 
-                            lastSubmittedInput = input
-                            onAction("COMMIT", input) 
-                        }, 
-                        colors = ButtonDefaults.buttonColors(containerColor = color)
-                    ) {
-                        Text("COMMIT INTEL", color = Color.Black)
+                    if (signal.kind != SignalKind.MUNDANE_BROADCAST) {
+                        Button(
+                            onClick = {
+                                lastSubmittedInput = input
+                                onAction("COMMIT", input)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = color)
+                        ) {
+                            Text(
+                                if (signal.kind == SignalKind.DEAD_DROP) "RECOVER TELEMETRY" else "COMMIT INTEL",
+                                color = Color.Black
+                            )
+                        }
                     }
-                    Button(onClick = { onAction("DISCARD", input) }, colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) {
-                        Text("DISCARD", color = Color.White)
+                    Button(
+                        onClick = { onAction("DISCARD", input) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                    ) {
+                        Text(
+                            if (signal.kind == SignalKind.MUNDANE_BROADCAST) "CLEAR CIVILIAN BAND" else "DISCARD",
+                            color = Color.White
+                        )
                     }
                 }
                 
