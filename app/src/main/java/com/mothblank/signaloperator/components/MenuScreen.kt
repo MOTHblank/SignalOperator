@@ -59,6 +59,37 @@ fun MainMenuLayout(
     color: Color
 ) {
     val hasSavedGame by viewModel.hasSavedGame.collectAsState()
+    var showNewGameConfirm by remember { mutableStateOf(false) }
+
+    if (showNewGameConfirm) {
+        AlertDialog(
+            onDismissRequest = { showNewGameConfirm = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.playClick()
+                        showNewGameConfirm = false
+                        onStartGame()
+                    }
+                ) {
+                    Text("START NEW RUN", color = Color.Red, fontFamily = FontFamily.Monospace)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewGameConfirm = false }) {
+                    Text("CANCEL", color = color, fontFamily = FontFamily.Monospace)
+                }
+            },
+            title = {
+                Text("OVERWRITE SAVED COMMUNICATION LINK?", color = Color.Red, fontFamily = FontFamily.Monospace)
+            },
+            text = {
+                Text("Starting a new run replaces the existing campaign save.", color = color, fontFamily = FontFamily.Monospace)
+            },
+            containerColor = Color.Black,
+            modifier = Modifier.border(1.dp, color)
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -131,7 +162,11 @@ fun MainMenuLayout(
                     label = "[01] START_NEW_COMMUNICATION_LINK",
                     onClick = {
                         viewModel.playClick()
-                        onStartGame()
+                        if (hasSavedGame) {
+                            showNewGameConfirm = true
+                        } else {
+                            onStartGame()
+                        }
                     },
                     color = color
                 )
