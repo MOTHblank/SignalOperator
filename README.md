@@ -19,6 +19,6 @@ Signal Operator is a retro terminal-styled interactive simulator for Android, bu
 
 *   **Platform**: Android (Min SDK 26, Target SDK 36)
 *   **Framework**: Jetpack Compose (100% Kotlin-first declarative UI)
-*   **Architecture Pattern**: Model-View-Intent (MVI) utilizing `StateFlow` and structured tick-loops inside a central `ViewModel` as the single source of truth.
-*   **Audio Implementation**: `SoundPool` engine integrated with a procedural WAV file generation system at startup. This prevents dynamic `AudioTrack` recreation, eliminates ashmem pinning warnings, and reduces playback latency.
+*   **Architecture**: Persistent campaign state (`GameState`) and transient tuner state (`SignalRuntimeState`) are exposed with `StateFlow`. Pure domain components own campaign reduction, hotspot planning, signal generation, and router topology; `MainViewModel` orchestrates lifecycle, persistence, audio, and UI intents.
+*   **Audio Implementation**: `SoundPool` handles generated UI effects, while a streaming `AudioTrack` synthesizes radio static/drone layers and a reusable voice track applies radio DSP to Android TTS output.
 *   **Gesture Handling**: Full-screen immersive display (`WindowCompat`) with back-gesture interception to prevent accidental app exits.
