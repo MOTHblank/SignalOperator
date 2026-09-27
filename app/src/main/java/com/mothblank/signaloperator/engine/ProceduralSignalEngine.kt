@@ -515,7 +515,7 @@ class ProceduralSignalEngine {
                 briefing = "Recovered kernel telemetry can be converted into one network reinforcement charge.",
                 urgency = Urgency.ELEVATED,
                 intelValue = 0,
-                effects = listOf(
+                commitEffects = listOf(
                     WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 1),
                     WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = 4),
                     WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 3)
@@ -604,7 +604,9 @@ class ProceduralSignalEngine {
                             destinationId = "loc-2"
                         ),
                         WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-2", amount = 30),
-                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-2"),
+                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-2")
+                    ),
+                    commitEffects = listOf(
                         WorldEffect(WorldEffectType.ADD_TRUST, amount = if (activeEcho2) 5 else -5)
                     )
                 )
@@ -617,7 +619,9 @@ class ProceduralSignalEngine {
                     intelValue = 2,
                     effects = listOf(
                         WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-3", amount = 40),
-                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-3"),
+                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-3")
+                    ),
+                    commitEffects = listOf(
                         WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 1)
                     )
                 )
@@ -634,7 +638,9 @@ class ProceduralSignalEngine {
                             WorldEffectType.MOVE_CHARACTER,
                             targetId = "char-1",
                             destinationId = "loc-1"
-                        ),
+                        )
+                    ),
+                    commitEffects = listOf(
                         WorldEffect(WorldEffectType.ADD_TRUST, amount = 8),
                         WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 5)
                     )
@@ -677,7 +683,7 @@ class ProceduralSignalEngine {
                     urgency = Urgency.HIGH,
                     locationId = "loc-1",
                     intelValue = 3,
-                    effects = listOf(
+                    commitEffects = listOf(
                         WorldEffect(WorldEffectType.ADD_LOCATION_SECURITY, targetId = "loc-1", amount = 15),
                         WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = 8)
                     )
@@ -704,7 +710,7 @@ class ProceduralSignalEngine {
                     urgency = Urgency.HIGH,
                     locationId = "loc-2",
                     intelValue = 3,
-                    effects = listOf(
+                    commitEffects = listOf(
                         WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 1),
                         WorldEffect(WorldEffectType.ADD_TRUST, amount = 6)
                     )
@@ -729,8 +735,10 @@ class ProceduralSignalEngine {
                     locationId = listOf("loc-1", "loc-2", "loc-3").random(random),
                     intelValue = 4,
                     effects = listOf(
-                        WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 2),
                         WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 6)
+                    ),
+                    commitEffects = listOf(
+                        WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 2)
                     )
                 )
             }
