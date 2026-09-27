@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -12,7 +13,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -45,6 +48,15 @@ fun Visualizer(
         ),
         label = "scope-time-value"
     )
+    val calibrationPulse = remember { Animatable(0f) }
+    val calibrated = activeSignal != null && stability >= 95f
+
+    LaunchedEffect(calibrated) {
+        if (calibrated) {
+            calibrationPulse.snapTo(1f)
+            calibrationPulse.animateTo(0f, tween(380))
+        }
+    }
 
     Canvas(modifier = modifier
         .fillMaxWidth()
@@ -59,6 +71,18 @@ fun Visualizer(
         val step = width / points
 
         // 1. Draw Cathode-Ray Grid Background
+        val syncPulse = calibrationPulse.value
+        if (syncPulse > 0f) {
+            drawRect(
+                color = color.copy(alpha = 0.08f + syncPulse * 0.12f)
+            )
+            drawLine(
+                color = color.copy(alpha = syncPulse * 0.8f),
+                start = Offset(0f, centerY),
+                end = Offset(width, centerY),
+                strokeWidth = 1f + syncPulse * 2f
+            )
+        }
         val gridAlpha = 0.08f
         val horizontalGridCount = 4
         for (j in 1 until horizontalGridCount) {
@@ -145,8 +169,8 @@ fun Visualizer(
         // Background beam glow for live wave
         drawPath(
             path = livePath,
-            color = color.copy(alpha = 0.25f),
-            style = Stroke(width = 5f)
+            color = color.copy(alpha = 0.25f + syncPulse * 0.18f),
+            style = Stroke(width = 5f + syncPulse * 2f)
         )
         
         // Core beam line for live wave
