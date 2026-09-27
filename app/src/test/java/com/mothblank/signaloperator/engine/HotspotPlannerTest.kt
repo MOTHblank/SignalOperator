@@ -1,6 +1,7 @@
 package com.mothblank.signaloperator.engine
 
 import com.mothblank.signaloperator.models.GamePhase
+import com.mothblank.signaloperator.models.SignalKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -41,4 +42,17 @@ class HotspotPlannerTest {
 
         assertEquals(100.30f, result)
     }
+    @Test
+    fun planGuaranteesEnoughMissionSignalsForProgression() {
+        val plan = HotspotPlanner.generatePlan(
+            seed = 814L,
+            phase = GamePhase.ACTIVE_INVESTIGATION,
+            requiredMissionSignals = 6
+        )
+
+        assertTrue(plan.count { it.kind == SignalKind.MISSION } >= 6)
+        assertTrue(plan.any { it.kind == SignalKind.MUNDANE_BROADCAST })
+        assertTrue(plan.any { it.kind == SignalKind.DEAD_DROP })
+    }
+
 }
