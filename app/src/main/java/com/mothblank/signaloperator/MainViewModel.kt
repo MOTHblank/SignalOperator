@@ -142,6 +142,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var radioLoopJob: Job? = null
     private var minHotspotDistance = 100f
     private var breachMonitorJob: Job? = null
+    private var lastFrequencyNotch = -1
+    private var calibrationSynced = false
     private var isAppInForeground = true
 
     private fun isEndingPhase(phase: GamePhase): Boolean {
@@ -350,6 +352,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         lockedHotspot = null
         activeSignalFrequency = null
         stabilityValue = 0f
+        calibrationSynced = false
         proximityValue = 0f
         frequencyValue = 88f
         gainValue = 50
@@ -403,6 +406,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         gainValue = 50
         filterValue = 50
         stabilityValue = 0f
+        calibrationSynced = false
         proximityValue = 0f
 
         if (_gameState.value.isSoundEnabled) {
@@ -437,6 +441,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         lockedHotspot = null
         activeSignalFrequency = null
         stabilityValue = 0f
+        calibrationSynced = false
         proximityValue = 0f
         generateHotspots(state.phase, state.seed, state.puzzlesRequired)
         updateProximity()
@@ -653,6 +658,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                     if (newProgress != currentProgress) {
                         _gameState.value = _gameState.value.copy(downloadProgress = newProgress)
+                        if (currentProgress < 100f && newProgress >= 100f) {
+                            soundManager.playPacketComplete()
+                            addLog("PACKET BUFFER COMPLETE. DECODER READY.", LogType.SYSTEM)
+                        }
                     }
                 }
 
@@ -699,17 +708,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private var lastProximityTick = 0f
-
     fun setFrequency(f: Float) {
-        frequencyValue = f.coerceIn(88.0f, 108.0f)
+        val nextFrequency = f.coerceIn(88.0f, 108.0f)
+        val notch = ((nextFrequency - 88f) * 4f).toInt()
+        if (notch != lastFrequencyNotch) {
+            soundManager.playScanNotch()
+            lastFrequencyNotch = notch
+        }
+
         val oldProximity = proximityValue
+        frequencyValue = nextFrequency
         updateProximity()
         val newProximity = proximityValue
-        if (newProximity > 0.1f && abs(newProximity - lastProximityTick) > 0.15f) {
-            soundManager.triggerHaptic("SCAN_NOTCH")
-            lastProximityTick = newProximity
+        if (oldProximity < 0.72f && newProximity >= 0.72f && activeSignalValue == null) {
+            soundManager.playCarrierNear()
         }
+
         checkHotspots()
         updateAudioParameters()
     }
@@ -838,6 +852,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             lockedHotspot = null
             activeSignalFrequency = null
             stabilityValue = 0f
+            calibrationSynced = false
             _gameState.value = _gameState.value.copy(downloadProgress = 0f)
             addLog("SIGNAL LOST.", LogType.SYSTEM)
             stopRadioLoop()
@@ -871,7 +886,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     activeSignalFrequency = activeHotspot
                     activeSignalValue = signal
+                    calibrationSynced = false
                     rememberFrequency(signal)
+                    soundManager.playLockAcquired()
                     addLog("LOCK ACQUIRED.", LogType.INTERCEPT)
                     
                     // Voiceover for the intercepted transmission
@@ -928,7 +945,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             newStability -= interference
         }
         
-        stabilityValue = newStability.coerceIn(0f, 100f)
+        val resolvedStability = newStability.coerceIn(0f, 100f)
+        stabilityValue = resolvedStability
+
+        if (!calibrationSynced && resolvedStability >= 95f) {
+            calibrationSynced = true
+            soundManager.playCalibrationSync()
+        } else if (calibrationSynced && resolvedStability < 92f) {
+            calibrationSynced = false
+        }
     }
 
     fun handleAction(action: String, solutionInput: String = "") {
@@ -972,6 +997,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (action == "COMMIT") {
+            soundManager.playCommit()
             when (signal.kind) {
                 SignalKind.MISSION -> {
                     addLog("TRANSMISSION SUCCESSFUL. INTEL LOGGED.", LogType.ACTION)
@@ -989,6 +1015,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 SignalKind.MUNDANE_BROADCAST -> addLog("PUBLIC BAND MISCLASSIFIED AS INTEL.", LogType.ERROR)
             }
         } else {
+            soundManager.playDiscard()
             when (signal.kind) {
                 SignalKind.MISSION -> addLog("MISSION TRAFFIC DELIBERATELY IGNORED.", LogType.ERROR)
                 SignalKind.DEAD_DROP -> addLog("KERNEL TELEMETRY DISCARDED.", LogType.ACTION)
@@ -1163,11 +1190,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun rotateRouterTile(x: Int, y: Int) {
         val game = _gameState.value.activeRouterGame ?: return
         val nextState = RouterPuzzleEngine.rotate(game, x, y)
+        val connectedNeighbors = RouterPuzzleEngine.connectedNeighborCount(nextState, x, y)
 
-        soundManager.triggerHaptic("SCAN_NOTCH")
+        soundManager.playRouterTile(connectedNeighbors)
         _gameState.value = _gameState.value.copy(activeRouterGame = nextState)
 
         if (RouterPuzzleEngine.isConnected(nextState)) {
+            soundManager.playCircuitComplete()
             solveRouterGame()
         }
     }
