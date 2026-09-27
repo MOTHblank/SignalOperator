@@ -509,6 +509,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         val target = state.locations.firstOrNull { it.id == locationId } ?: return
+        if (target.security >= 90 && target.threat == 0) {
+            addLog("${target.name} ALREADY OPERATING AT HIGH SECURITY.", LogType.SYSTEM)
+            return
+        }
         val updated = state.locations.map { location ->
             if (location.id == locationId) {
                 location.copy(
@@ -612,12 +616,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     val isStable = stabilityValue >= 90f
 
                     val currentProgress = _gameState.value.downloadProgress
-                    val delta = if (currentProgress >= 100f) {
-                        0f // Lock at 100% once complete
-                    } else if (isClose && isStable) {
-                        2.0f // Download progresses when aligned & stable
-                    } else {
-                        0f // Pause download progress instead of draining it to prevent frustration
+                    val delta = when {
+                        currentProgress >= 100f -> 0f
+                        isClose && stabilityValue >= 95f -> {
+                            6f + ((stabilityValue - 95f) / 5f).coerceIn(0f, 1f) * 2f
+                        }
+                        isClose && isStable -> 1.5f
+                        else -> 0f
                     }
                     val newProgress = (currentProgress + delta).coerceIn(0f, 100f)
 
@@ -735,6 +740,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _logs.value = _logs.value + entry
     }
 
+    private fun rememberFrequency(signal: SignalData) {
+        val state = _gameState.value
+        val known = state.knownFrequencies.toMutableList()
+        val index = known.indexOfFirst { abs(it.frequency - signal.frequency) < 0.03f }
+        val label = when (signal.kind) {
+            SignalKind.MISSION -> signal.outcome?.briefing
+                ?.substringBefore('.')
+                ?.take(32)
+                ?: signal.sender
+            SignalKind.DEAD_DROP -> "KERNEL TELEMETRY"
+            SignalKind.MUNDANE_BROADCAST -> signal.sender
+        }
+
+        if (index >= 0) {
+            val previous = known[index]
+            known[index] = previous.copy(
+                label = label,
+                kind = signal.kind,
+                lastPhase = state.phase,
+                visits = previous.visits + 1
+            )
+        } else {
+            known.add(
+                KnownFrequency(
+                    frequency = signal.frequency,
+                    label = label,
+                    kind = signal.kind,
+                    lastPhase = state.phase
+                )
+            )
+        }
+
+        _gameState.value = state.copy(
+            knownFrequencies = known.takeLast(40)
+        )
+    }
+
     private fun startRadioLoop(text: String, isAnomalous: Boolean) {
         radioLoopJob?.cancel()
         if (!_gameState.value.isTtsEnabled) return
@@ -804,6 +846,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     activeSignalFrequency = activeHotspot
                     activeSignalValue = signal
+                    rememberFrequency(signal)
                     addLog("LOCK ACQUIRED.", LogType.INTERCEPT)
                     
                     // Voiceover for the intercepted transmission
