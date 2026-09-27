@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.mothblank.signaloperator"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.mothblank.signaloperator"
-        minSdk = 31 // Required for AGSL RuntimeShader
-        targetSdk = 34
+        minSdk = 26
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled = true
