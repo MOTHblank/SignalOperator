@@ -114,6 +114,18 @@ data class SignalRuntimeState(
     val proximity: Float = 0f
 )
 
+enum class FeedbackTone {
+    POSITIVE,
+    NEGATIVE,
+    SYSTEM
+}
+
+data class OperatorFeedback(
+    val id: String,
+    val text: String,
+    val tone: FeedbackTone
+)
+
 data class LogEntry(
     val id: String,
     val timestamp: String,
