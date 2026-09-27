@@ -1,6 +1,7 @@
 package com.mothblank.signaloperator.components
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -19,6 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.mothblank.signaloperator.engine.RouterPuzzleEngine
 import com.mothblank.signaloperator.models.RouterGameState
 import com.mothblank.signaloperator.models.RouterTile
 import com.mothblank.signaloperator.models.TilePath
@@ -84,6 +87,9 @@ fun RouterModal(
 
             // Grid rendering
             val tileMap = game.grid.associateBy { it.x to it.y }
+            val energizedTiles = remember(game.grid, game.entryY, game.exitY) {
+                RouterPuzzleEngine.energizedTiles(game)
+            }
 
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -132,6 +138,7 @@ fun RouterModal(
                                     RouterTileView(
                                         tile = tile,
                                         color = color,
+                                        energized = (x to y) in energizedTiles,
                                         modifier = Modifier
                                             .fillMaxSize()
                                             .rotate(animatedRotation)
@@ -165,16 +172,32 @@ fun RouterModal(
 fun RouterTileView(
     tile: RouterTile,
     color: Color,
+    energized: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val energy by animateFloatAsState(
+        targetValue = if (energized) 1f else 0f,
+        animationSpec = tween(140),
+        label = "router-energy"
+    )
+
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        val stroke = 6.dp.toPx()
+        val stroke = (6f + energy * 2f).dp.toPx()
+        val pathColor = color.copy(alpha = 0.65f + energy * 0.35f)
         
+        if (energy > 0f) {
+            drawCircle(
+                color = color.copy(alpha = 0.08f + energy * 0.16f),
+                radius = 25.dp.toPx(),
+                center = Offset(w / 2, h / 2)
+            )
+        }
+
         // Draw the core socket
         drawCircle(
-            color = color.copy(alpha = 0.2f),
+            color = color.copy(alpha = 0.2f + energy * 0.3f),
             radius = 12.dp.toPx(),
             center = Offset(w / 2, h / 2)
         )
@@ -183,7 +206,7 @@ fun RouterTileView(
             TilePath.STRAIGHT -> {
                 // Draws path from left edge to right edge (at 0 degrees)
                 drawLine(
-                    color = color,
+                    color = pathColor,
                     start = Offset(0f, h / 2),
                     end = Offset(w, h / 2),
                     strokeWidth = stroke
@@ -192,13 +215,13 @@ fun RouterTileView(
             TilePath.CORNER -> {
                 // Draws path from right edge to bottom edge (at 0 degrees)
                 drawLine(
-                    color = color,
+                    color = pathColor,
                     start = Offset(w / 2, h / 2),
                     end = Offset(w, h / 2),
                     strokeWidth = stroke
                 )
                 drawLine(
-                    color = color,
+                    color = pathColor,
                     start = Offset(w / 2, h / 2),
                     end = Offset(w / 2, h),
                     strokeWidth = stroke
@@ -207,13 +230,13 @@ fun RouterTileView(
             TilePath.CROSS -> {
                 // Draws left-right and top-bottom crossing paths
                 drawLine(
-                    color = color,
+                    color = pathColor,
                     start = Offset(0f, h / 2),
                     end = Offset(w, h / 2),
                     strokeWidth = stroke
                 )
                 drawLine(
-                    color = color,
+                    color = pathColor,
                     start = Offset(w / 2, 0f),
                     end = Offset(w / 2, h),
                     strokeWidth = stroke
