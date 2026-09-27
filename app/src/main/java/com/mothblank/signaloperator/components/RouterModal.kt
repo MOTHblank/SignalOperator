@@ -34,13 +34,16 @@ fun RouterModal(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.95f))
-            .padding(16.dp),
+            .background(Color.Black.copy(alpha = 0.96f))
+            .padding(horizontal = 12.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 360.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
                 text = "SYSTEM ALERT: FIREWALL BREACH",
@@ -57,7 +60,7 @@ fun RouterModal(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.width(280.dp)
+                modifier = Modifier.fillMaxWidth(0.88f)
             ) {
                 Text(
                     text = "TIME REMAINING:",
