@@ -50,7 +50,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun getTts(): TextToSpeechEngine {
-        val signal = _activeSignal.value
+        val signal = activeSignalValue
         val tts = androidTts
         
         if (tts.isReady() && signal != null) {
@@ -84,23 +84,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _gameState = MutableStateFlow(GameState())
     val gameState: StateFlow<GameState> = _gameState.asStateFlow()
 
-    private val _frequency = MutableStateFlow(88.0f)
-    val frequency: StateFlow<Float> = _frequency.asStateFlow()
+    private val _signalRuntime = MutableStateFlow(SignalRuntimeState())
+    val signalRuntime: StateFlow<SignalRuntimeState> = _signalRuntime.asStateFlow()
 
-    private val _gain = MutableStateFlow(50)
-    val gain: StateFlow<Int> = _gain.asStateFlow()
+    private var frequencyValue: Float
+        get() = _signalRuntime.value.frequency
+        set(value) {
+            _signalRuntime.value = _signalRuntime.value.copy(frequency = value)
+        }
 
-    private val _filter = MutableStateFlow(50)
-    val filter: StateFlow<Int> = _filter.asStateFlow()
+    private var gainValue: Int
+        get() = _signalRuntime.value.gain
+        set(value) {
+            _signalRuntime.value = _signalRuntime.value.copy(gain = value)
+        }
 
-    private val _activeSignal = MutableStateFlow<SignalData?>(null)
-    val activeSignal: StateFlow<SignalData?> = _activeSignal.asStateFlow()
+    private var filterValue: Int
+        get() = _signalRuntime.value.filter
+        set(value) {
+            _signalRuntime.value = _signalRuntime.value.copy(filter = value)
+        }
 
-    private val _stability = MutableStateFlow(0f)
-    val stability: StateFlow<Float> = _stability.asStateFlow()
+    private var activeSignalValue: SignalData?
+        get() = _signalRuntime.value.activeSignal
+        set(value) {
+            _signalRuntime.value = _signalRuntime.value.copy(activeSignal = value)
+        }
 
-    private val _proximity = MutableStateFlow(0f)
-    val proximity: StateFlow<Float> = _proximity.asStateFlow()
+    private var stabilityValue: Float
+        get() = _signalRuntime.value.stability
+        set(value) {
+            _signalRuntime.value = _signalRuntime.value.copy(stability = value)
+        }
+
+    private var proximityValue: Float
+        get() = _signalRuntime.value.proximity
+        set(value) {
+            _signalRuntime.value = _signalRuntime.value.copy(proximity = value)
+        }
 
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
     val logs: StateFlow<List<LogEntry>> = _logs.asStateFlow()
@@ -309,14 +330,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         routerCountdownJob?.cancel()
 
         _logs.value = emptyList()
-        _activeSignal.value = null
+        activeSignalValue = null
         lockedHotspot = null
         activeSignalFrequency = null
-        _stability.value = 0f
-        _proximity.value = 0f
-        _frequency.value = 88f
-        _gain.value = 50
-        _filter.value = 50
+        stabilityValue = 0f
+        proximityValue = 0f
+        frequencyValue = 88f
+        gainValue = 50
+        filterValue = 50
 
         _gameState.value = GameState(
             isInMenu = true,
@@ -355,14 +376,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         initializeWorld()
         generateHotspots(GamePhase.APTITUDE_TEST, _gameState.value.seed, _gameState.value.puzzlesRequired)
 
-        _activeSignal.value = null
+        activeSignalValue = null
         lockedHotspot = null
         activeSignalFrequency = null
-        _frequency.value = 88f
-        _gain.value = 50
-        _filter.value = 50
-        _stability.value = 0f
-        _proximity.value = 0f
+        frequencyValue = 88f
+        gainValue = 50
+        filterValue = 50
+        stabilityValue = 0f
+        proximityValue = 0f
 
         if (_gameState.value.isSoundEnabled) {
             soundManager.startStatic()
@@ -392,11 +413,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             downloadProgress = 0f,
             isMapViewActive = false
         )
-        _activeSignal.value = null
+        activeSignalValue = null
         lockedHotspot = null
         activeSignalFrequency = null
-        _stability.value = 0f
-        _proximity.value = 0f
+        stabilityValue = 0f
+        proximityValue = 0f
         generateHotspots(state.phase, state.seed, state.puzzlesRequired)
         updateProximity()
 
@@ -493,7 +514,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // Drift target frequency and update download progress
-                val activeSignalVal = _activeSignal.value
+                val activeSignalVal = activeSignalValue
                 val baseHotspot = lockedHotspot
                 if (activeSignalVal != null && baseHotspot != null) {
                     val targetFreq = activeSignalFrequency ?: baseHotspot
@@ -507,11 +528,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         updateAudioParameters()
                     }
 
-                    val currentFreq = _frequency.value
+                    val currentFreq = frequencyValue
                     val finalTargetFreq = activeSignalFrequency ?: baseHotspot
                     val distance = abs(currentFreq - finalTargetFreq)
                     val isClose = distance <= 0.2f
-                    val isStable = _stability.value >= 90f
+                    val isStable = stabilityValue >= 90f
 
                     val currentProgress = _gameState.value.downloadProgress
                     val delta = if (currentProgress >= 100f) {
@@ -537,15 +558,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Randomly nudge the sliders
         if (Random.nextFloat() < 0.1f * intensity) {
             val freqNudge = (Random.nextFloat() - 0.5f) * 0.2f * intensity
-            _frequency.value = (_frequency.value + freqNudge).coerceIn(88.0f, 108.0f)
+            frequencyValue = (frequencyValue + freqNudge).coerceIn(88.0f, 108.0f)
         }
         if (Random.nextFloat() < 0.05f * intensity) {
             val gainNudge = if (Random.nextBoolean()) 1 else -1
-            _gain.value = (_gain.value + gainNudge).coerceIn(0, 100)
+            gainValue = (gainValue + gainNudge).coerceIn(0, 100)
         }
         if (Random.nextFloat() < 0.05f * intensity) {
             val filterNudge = if (Random.nextBoolean()) 1 else -1
-            _filter.value = (_filter.value + filterNudge).coerceIn(0, 100)
+            filterValue = (filterValue + filterNudge).coerceIn(0, 100)
         }
 
         updateProximity()
@@ -574,10 +595,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var lastProximityTick = 0f
 
     fun setFrequency(f: Float) {
-        _frequency.value = f.coerceIn(88.0f, 108.0f)
-        val oldProximity = _proximity.value
+        frequencyValue = f.coerceIn(88.0f, 108.0f)
+        val oldProximity = proximityValue
         updateProximity()
-        val newProximity = _proximity.value
+        val newProximity = proximityValue
         if (newProximity > 0.1f && abs(newProximity - lastProximityTick) > 0.15f) {
             soundManager.triggerHaptic("SCAN_NOTCH")
             lastProximityTick = newProximity
@@ -587,7 +608,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateProximity() {
-        val currentFreq = _frequency.value
+        val currentFreq = frequencyValue
         val targetFreq = activeSignalFrequency ?: lockedHotspot
         minHotspotDistance = if (targetFreq != null) {
             abs(targetFreq - currentFreq)
@@ -596,17 +617,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             unsolved.minOfOrNull { abs(it - currentFreq) } ?: 100f
         }
         // Proximity is 1.0 when on hotspot, 0.0 when 2.0+ MHz away
-        _proximity.value = (1.0f - (minHotspotDistance / 2.0f)).coerceIn(0f, 1.0f)
+        proximityValue = (1.0f - (minHotspotDistance / 2.0f)).coerceIn(0f, 1.0f)
     }
 
     private fun updateAudioParameters() {
         val masterVol = if (_gameState.value.isSoundEnabled) 1.0f else 0.0f
-        val baseVol = ((0.2f + _proximity.value * 0.8f).coerceIn(0f, 1f)) * masterVol
-        val vol = if (_activeSignal.value != null) baseVol * 0.10f else baseVol
-        val pitch = (0.8f + _proximity.value * 0.4f).coerceIn(0.5f, 2.0f)
-        soundManager.updateStaticParameters(vol, pitch, _stability.value)
+        val baseVol = ((0.2f + proximityValue * 0.8f).coerceIn(0f, 1f)) * masterVol
+        val vol = if (activeSignalValue != null) baseVol * 0.10f else baseVol
+        val pitch = (0.8f + proximityValue * 0.4f).coerceIn(0.5f, 2.0f)
+        soundManager.updateStaticParameters(vol, pitch, stabilityValue)
 
-        if (_gameState.value.isSoundEnabled && _activeSignal.value == null && minHotspotDistance < 0.6f) {
+        if (_gameState.value.isSoundEnabled && activeSignalValue == null && minHotspotDistance < 0.6f) {
             val proximityFactor = (1.0f - (minHotspotDistance / 0.6f)).coerceIn(0f, 1f)
             val whistleVol = proximityFactor * 0.12f
             val whistleFreq = (minHotspotDistance / 0.6f) * 1800f + 80f
@@ -620,13 +641,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setGain(g: Int) {
-        _gain.value = g.coerceIn(0, 100)
+        gainValue = g.coerceIn(0, 100)
         updateStability()
         updateAudioParameters()
     }
 
     fun setFilter(f: Int) {
-        _filter.value = f.coerceIn(0, 100)
+        filterValue = f.coerceIn(0, 100)
         updateStability()
         updateAudioParameters()
     }
@@ -658,7 +679,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun checkHotspots() {
         if (isScanning) return
-        val currentFreq = _frequency.value
+        val currentFreq = frequencyValue
         
         val hasActiveLock = lockedHotspot != null
         val isStillLocked = if (hasActiveLock) {
@@ -669,10 +690,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (hasActiveLock && !isStillLocked) {
-            _activeSignal.value = null
+            activeSignalValue = null
             lockedHotspot = null
             activeSignalFrequency = null
-            _stability.value = 0f
+            stabilityValue = 0f
             _gameState.value = _gameState.value.copy(downloadProgress = 0f)
             addLog("SIGNAL LOST.", LogType.SYSTEM)
             stopRadioLoop()
@@ -683,7 +704,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 solvedHotspots = _gameState.value.solvedHotspots,
                 currentFrequency = currentFreq
             )
-            if (activeHotspot != null && _activeSignal.value == null) {
+            if (activeHotspot != null && activeSignalValue == null) {
                 isScanning = true
                 lockedHotspot = activeHotspot
                 
@@ -704,7 +725,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     )
                     activeSignalFrequency = activeHotspot
-                    _activeSignal.value = signal
+                    activeSignalValue = signal
                     addLog("LOCK ACQUIRED.", LogType.INTERCEPT)
                     
                     // Voiceover for the intercepted transmission
@@ -736,15 +757,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateStability() {
-        val signal = _activeSignal.value
+        val signal = activeSignalValue
         if (signal == null) {
-            _stability.value = 0f
+            stabilityValue = 0f
             return
         }
 
         // Precision calibration: total diff of 5 allowed for 95% stability
-        val gainDiff = abs(signal.targetGain - _gain.value)
-        val filterDiff = abs(signal.targetFilter - _filter.value)
+        val gainDiff = abs(signal.targetGain - gainValue)
+        val filterDiff = abs(signal.targetFilter - filterValue)
         
         val totalDiff = gainDiff + filterDiff
         // 100 - (10) = 90. We want 100 - (5) = 95.
@@ -754,11 +775,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             newStability -= (Math.random() * (_gameState.value.corruptionLevel * 5)).toFloat()
         }
         
-        _stability.value = newStability.coerceIn(0f, 100f)
+        stabilityValue = newStability.coerceIn(0f, 100f)
     }
 
     fun handleAction(action: String, solutionInput: String = "") {
-        val signal = _activeSignal.value ?: return
+        val signal = activeSignalValue ?: return
         val currentHotspot = lockedHotspot ?: return
 
         if (action == "COMMIT") {
@@ -767,7 +788,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 soundManager.playAlert()
                 return
             }
-            if (_stability.value < 95f) {
+            if (stabilityValue < 95f) {
                 addLog("ERROR: SIGNAL UNSTABLE. TRANSMISSION FAILED.", LogType.ERROR)
                 soundManager.playAlert()
                 return
@@ -864,10 +885,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             generateHotspots(nextState.phase, nextState.seed, nextState.puzzlesRequired)
         }
 
-        _activeSignal.value = null
+        activeSignalValue = null
         lockedHotspot = null
         activeSignalFrequency = null
-        _stability.value = 0f
+        stabilityValue = 0f
         updateProximity()
         updateAudioParameters()
         saveGame()
@@ -887,7 +908,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         isAppInForeground = true
         soundManager.resume()
         if (isRuntimeActive()) {
-            _activeSignal.value?.let { startRadioLoop(it.encodedMessage, it.isAnomalous) }
+            activeSignalValue?.let { startRadioLoop(it.encodedMessage, it.isAnomalous) }
         }
     }
 
