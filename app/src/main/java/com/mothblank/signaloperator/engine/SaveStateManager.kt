@@ -9,15 +9,29 @@ import org.json.JSONObject
 object SaveStateManager {
     private const val PREFS_NAME = "signal_operator_save_state"
     private const val KEY_SAVE_DATA = "save_data"
+    private const val CURRENT_SCHEMA_VERSION = 2
 
     data class SavedData(
         val gameState: GameState,
         val logs: List<LogEntry>
     )
 
+    fun hasSave(context: Context): Boolean {
+        return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .contains(KEY_SAVE_DATA)
+    }
+
+    fun clearSave(context: Context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_SAVE_DATA)
+            .apply()
+    }
+
     fun saveGame(context: Context, state: GameState, logs: List<LogEntry>) {
         try {
             val json = JSONObject()
+            json.put("schemaVersion", CURRENT_SCHEMA_VERSION)
             json.put("phase", state.phase.name)
             json.put("corruptionLevel", state.corruptionLevel.toDouble())
             json.put("archivedSignals", state.archivedSignals)
@@ -81,6 +95,11 @@ object SaveStateManager {
         val dataStr = prefs.getString(KEY_SAVE_DATA, null) ?: return null
         try {
             val json = JSONObject(dataStr)
+            val schemaVersion = json.optInt("schemaVersion", 1)
+            if (schemaVersion !in 1..CURRENT_SCHEMA_VERSION) {
+                Log.e("SaveStateManager", "Unsupported save schema version: $schemaVersion")
+                return null
+            }
             val phase = GamePhase.valueOf(json.getString("phase"))
             val corruptionLevel = json.getDouble("corruptionLevel").toFloat()
             val archivedSignals = json.getInt("archivedSignals")
