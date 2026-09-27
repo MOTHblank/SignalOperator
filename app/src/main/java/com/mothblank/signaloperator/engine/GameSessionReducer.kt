@@ -25,19 +25,27 @@ object GameSessionReducer {
         solutionInput: String,
         random: Random = Random.Default
     ): SessionResolution {
+        require(action == "COMMIT" || action == "DISCARD") {
+            "Unsupported signal action: $action"
+        }
+        if (current.phase == GamePhase.THE_INTERVIEW && action != "COMMIT") {
+            return SessionResolution(current)
+        }
+
         var state = current
         val solvedHotspots = current.solvedHotspots.toMutableSet()
         solvedHotspots.add(currentHotspot)
 
         when (signal.kind) {
             SignalKind.MISSION -> {
+                state = applyEffects(state, signal.outcome?.effects.orEmpty())
                 state = if (action == "COMMIT") {
-                    applyOutcome(
+                    applyEffects(
                         state.copy(
                             archivedSignals = state.archivedSignals + 1,
                             puzzlesSolved = state.puzzlesSolved + 1
                         ),
-                        signal.outcome
+                        signal.outcome?.commitEffects.orEmpty()
                     )
                 } else {
                     state.copy(
@@ -51,9 +59,9 @@ object GameSessionReducer {
 
             SignalKind.DEAD_DROP -> {
                 state = if (action == "COMMIT") {
-                    applyOutcome(
+                    applyEffects(
                         state.copy(deadDropsRecovered = state.deadDropsRecovered + 1),
-                        signal.outcome
+                        signal.outcome?.commitEffects.orEmpty()
                     )
                 } else {
                     state.copy(
@@ -170,8 +178,8 @@ object GameSessionReducer {
         )
     }
 
-    private fun applyOutcome(state: GameState, outcome: SignalOutcome?): GameState {
-        if (outcome == null) return state
+    private fun applyEffects(state: GameState, effects: List<WorldEffect>): GameState {
+        if (effects.isEmpty()) return state
 
         var locations = state.locations
         var characters = state.characters
@@ -180,7 +188,7 @@ object GameSessionReducer {
         var containment = state.containmentIntegrity
         var charges = state.securityCharges
 
-        outcome.effects.forEach { effect ->
+        effects.forEach { effect ->
             when (effect.type) {
                 WorldEffectType.ADD_LOCATION_THREAT -> {
                     locations = locations.map { location ->
