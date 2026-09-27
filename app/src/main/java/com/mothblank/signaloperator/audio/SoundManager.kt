@@ -432,6 +432,12 @@ class SoundManager(private val context: Context) {
         }
     }
 
+    fun playTypewriterTick() {
+        if (clickSoundId != -1) {
+            soundPool.play(clickSoundId, 0.08f, 0.08f, 0, 0, 1.35f)
+        }
+    }
+
     fun playAlert() {
         triggerHaptic("ALARM")
         if (alertSoundId != -1) {
