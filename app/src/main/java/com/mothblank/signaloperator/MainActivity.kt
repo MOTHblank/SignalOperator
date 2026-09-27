@@ -229,9 +229,14 @@ class MainActivity : ComponentActivity() {
                                     style = MaterialTheme.typography.labelMedium
                                 )
                                 Text(
-                                    text  = "PROGRESS: ${gameState.puzzlesSolved}/${gameState.puzzlesRequired}", 
-                                    color = currentColor, 
+                                    text = "PROGRESS: ${gameState.puzzlesSolved}/${gameState.puzzlesRequired}",
+                                    color = currentColor,
                                     style = MaterialTheme.typography.labelMedium
+                                )
+                                Text(
+                                    text = "NET: ${gameState.containmentIntegrity}%  EXP: ${gameState.exposure}%  TRUST: ${gameState.trustInEcho}%  SEC: ${gameState.securityCharges}",
+                                    color = currentColor.copy(alpha = 0.65f),
+                                    style = MaterialTheme.typography.labelSmall
                                 )
                             }
                             
@@ -256,10 +261,11 @@ class MainActivity : ComponentActivity() {
                             modifier  = Modifier.height(48.dp).fillMaxWidth()
                         )
                         FrequencyTuner(
-                            frequency    = frequency,
+                            frequency = frequency,
                             setFrequency = { viewModel.setFrequency(it) },
-                            proximity    = proximity,
-                            color        = currentColor,
+                            proximity = proximity,
+                            knownFrequencies = gameState.knownFrequencies,
+                            color = currentColor,
                             onShowHint   = {
                                 activeHint = Pair(
                                     "SYSTEM CALIBRATION",
