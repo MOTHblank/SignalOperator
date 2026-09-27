@@ -17,6 +17,12 @@ enum class PuzzleType {
     OBSERVATION
 }
 
+enum class SignalKind {
+    MISSION,
+    MUNDANE_BROADCAST,
+    DEAD_DROP
+}
+
 data class SignalData(
     val id: String,
     val frequency: Float,
@@ -29,7 +35,8 @@ data class SignalData(
     val cipherType: String,
     val sender: String,
     val isAnomalous: Boolean,
-    val metadata: String
+    val metadata: String,
+    val kind: SignalKind = SignalKind.MISSION
 )
 
 data class LogEntry(
