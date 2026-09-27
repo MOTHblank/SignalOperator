@@ -111,6 +111,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val currentDialogueIndex: StateFlow<Int> = _currentDialogueIndex.asStateFlow()
 
     private val hotspots = mutableListOf<Float>()
+    private val hotspotKinds = mutableMapOf<Float, SignalKind>()
     private var isScanning = false
     private var lockedHotspot: Float? = null
     private var activeSignalFrequency: Float? = null
@@ -147,10 +148,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 downloadProgress = 0f
             )
             _logs.value = saved.logs
-            generateHotspots(saved.gameState.phase, saved.gameState.seed)
+            generateHotspots(saved.gameState.phase, saved.gameState.seed, saved.gameState.puzzlesRequired)
         } else {
             initializeWorld()
-            generateHotspots(_gameState.value.phase, _gameState.value.seed)
+            generateHotspots(_gameState.value.phase, _gameState.value.seed, _gameState.value.puzzlesRequired)
         }
 
         if (_gameState.value.isSoundEnabled) {
@@ -324,7 +325,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isTtsEnabled = true
         )
         initializeWorld()
-        generateHotspots(_gameState.value.phase, _gameState.value.seed)
+        generateHotspots(_gameState.value.phase, _gameState.value.seed, _gameState.value.puzzlesRequired)
 
         soundManager.startStatic()
         updateAudioParameters()
@@ -351,7 +352,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isTtsEnabled = settings.isTtsEnabled
         )
         initializeWorld()
-        generateHotspots(GamePhase.APTITUDE_TEST, _gameState.value.seed)
+        generateHotspots(GamePhase.APTITUDE_TEST, _gameState.value.seed, _gameState.value.puzzlesRequired)
 
         _activeSignal.value = null
         lockedHotspot = null
@@ -395,7 +396,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         activeSignalFrequency = null
         _stability.value = 0f
         _proximity.value = 0f
-        generateHotspots(state.phase, state.seed)
+        generateHotspots(state.phase, state.seed, state.puzzlesRequired)
         updateProximity()
 
         if (_gameState.value.isSoundEnabled) {
@@ -551,9 +552,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateAudioParameters()
     }
 
-    private fun generateHotspots(phase: GamePhase, seed: Long) {
+    private fun generateHotspots(
+        phase: GamePhase,
+        seed: Long,
+        requiredMissionSignals: Int
+    ) {
+        val plan = HotspotPlanner.generatePlan(
+            seed = seed,
+            phase = phase,
+            requiredMissionSignals = requiredMissionSignals
+        )
         hotspots.clear()
-        hotspots.addAll(HotspotPlanner.generate(seed, phase))
+        hotspotKinds.clear()
+        plan.forEach { hotspot ->
+            hotspots.add(hotspot.frequency)
+            hotspotKinds[hotspot.frequency] = hotspot.kind
+        }
     }
 
     private var lastProximityTick = 0f
@@ -684,7 +698,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             activeHotspot,
                             _gameState.value.seed,
                             getSystemData(),
-                            _gameState.value.puzzlesSolved
+                            _gameState.value.puzzlesSolved,
+                            hotspotKinds[activeHotspot]
                         )
                     )
                     activeSignalFrequency = activeHotspot
@@ -845,7 +860,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         resolution.highScore?.let(::saveHighScore)
 
         if (nextState.phase != current.phase && !isEndingPhase(nextState.phase)) {
-            generateHotspots(nextState.phase, nextState.seed)
+            generateHotspots(nextState.phase, nextState.seed, nextState.puzzlesRequired)
         }
 
         _activeSignal.value = null
