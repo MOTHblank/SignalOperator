@@ -67,9 +67,15 @@ fun TerminalRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
     ) {
+        val rowColor = when (log.type) {
+            LogType.ERROR -> Color.Red
+            LogType.INTERCEPT -> color
+            LogType.ACTION -> color.copy(alpha = 0.9f)
+            LogType.SYSTEM -> color.copy(alpha = 0.62f)
+        }
         Text(
             text = "[${log.timestamp}] ${log.text}",
-            color = color,
+            color = rowColor,
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.weight(1f)
         )
