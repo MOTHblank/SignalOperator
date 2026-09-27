@@ -23,16 +23,27 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import java.util.Locale
+import com.mothblank.signaloperator.models.KnownFrequency
+import com.mothblank.signaloperator.models.SignalKind
 
 @Composable
 fun FrequencyTuner(
     frequency: Float, 
     setFrequency: (Float) -> Unit,
     proximity: Float,
+    knownFrequencies: List<KnownFrequency>,
     color: Color,
     modifier: Modifier = Modifier,
     onShowHint: (() -> Unit)? = null
 ) {
+    val scaleLabelPaint = remember(color) {
+        android.graphics.Paint().apply {
+            this.textSize = 22f
+            this.isFakeBoldText = true
+            this.textAlign = android.graphics.Paint.Align.CENTER
+        }
+    }
+
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -45,6 +56,14 @@ fun FrequencyTuner(
                     color = color, 
                     style = MaterialTheme.typography.labelLarge
                 )
+                if (knownFrequencies.isNotEmpty()) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "MEM ${knownFrequencies.size}",
+                        color = color.copy(alpha = 0.55f),
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
                 if (onShowHint != null) {
                     Spacer(modifier = Modifier.width(6.dp))
                     IconButton(
@@ -141,12 +160,7 @@ fun FrequencyTuner(
                         freqVal.toString(),
                         x,
                         height - 2f,
-                        android.graphics.Paint().apply {
-                            this.color = color.toArgb()
-                            this.textSize = 22f
-                            this.isFakeBoldText = true
-                            this.textAlign = android.graphics.Paint.Align.CENTER
-                        }
+                        scaleLabelPaint.apply { this.color = color.toArgb() }
                     )
                 }
             }
@@ -166,6 +180,21 @@ fun FrequencyTuner(
                 minorFreq += 0.5f
             }
             
+            knownFrequencies.forEach { known ->
+                val x = ((known.frequency - 88f) / range) * width
+                val markerColor = when (known.kind) {
+                    SignalKind.MISSION -> color.copy(alpha = 0.65f)
+                    SignalKind.MUNDANE_BROADCAST -> Color.Gray.copy(alpha = 0.55f)
+                    SignalKind.DEAD_DROP -> Color.Magenta.copy(alpha = 0.75f)
+                }
+                drawLine(
+                    color = markerColor,
+                    start = Offset(x, scaleY - 10f),
+                    end = Offset(x, scaleY - 4f),
+                    strokeWidth = if (known.visits > 1) 3f else 2f
+                )
+            }
+
             // Draw cursor line for the active frequency
             val cursorX = ((frequency - 88f) / range) * width
             drawLine(
