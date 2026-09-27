@@ -502,6 +502,18 @@ class SoundManager(private val context: Context) {
         }
     }
 
+    fun playPacketComplete() {
+        triggerHaptic("CONFIRM")
+        if (effectsEnabled) {
+            if (clickSoundId != -1) {
+                soundPool.play(clickSoundId, 0.30f, 0.30f, 2, 0, 1.55f)
+            }
+            if (alertSoundId != -1) {
+                soundPool.play(alertSoundId, 0.07f, 0.07f, 1, 0, 1.65f)
+            }
+        }
+    }
+
     fun playRouterTile(connectedNeighbors: Int) {
         triggerHaptic(if (connectedNeighbors > 0) "ROUTER_CONNECTED" else "SCAN_NOTCH")
         if (effectsEnabled && clickSoundId != -1) {
