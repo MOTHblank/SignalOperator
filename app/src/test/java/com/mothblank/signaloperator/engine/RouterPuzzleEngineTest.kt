@@ -49,4 +49,24 @@ class RouterPuzzleEngineTest {
 
         assertFalse(RouterPuzzleEngine.isConnected(rotated))
     }
+    @Test
+    fun generatedPuzzleStartsUnsolvedButHasGuaranteedSolution() {
+        val generated = RouterPuzzleEngine.create(
+            locationId = "loc",
+            seed = 814L
+        )
+
+        assertFalse(RouterPuzzleEngine.isConnected(generated))
+
+        val solvedGrid = generated.grid.map { tile ->
+            if (tile.y == generated.entryY) {
+                tile.copy(type = TilePath.STRAIGHT, rotationDegrees = 0)
+            } else {
+                tile
+            }
+        }
+
+        assertTrue(RouterPuzzleEngine.isConnected(generated.copy(grid = solvedGrid)))
+    }
+
 }
