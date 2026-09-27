@@ -52,6 +52,49 @@ object RouterPuzzleEngine {
         )
     }
 
+    fun energizedTiles(game: RouterGameState): Set<Pair<Int, Int>> {
+        val gridMap = game.grid.associateBy { it.x to it.y }
+        val start = 0 to game.entryY
+        val startTile = gridMap[start] ?: return emptySet()
+        if (WEST !in ports(startTile)) return emptySet()
+
+        val energized = mutableSetOf<Pair<Int, Int>>()
+        val queue = ArrayDeque<Pair<Int, Int>>()
+        energized.add(start)
+        queue.add(start)
+
+        while (queue.isNotEmpty()) {
+            val point = queue.removeFirst()
+            val tile = gridMap[point] ?: continue
+
+            ports(tile).forEach { port ->
+                val nextX = point.first + when (port) {
+                    EAST -> 1
+                    WEST -> -1
+                    else -> 0
+                }
+                val nextY = point.second + when (port) {
+                    SOUTH -> 1
+                    NORTH -> -1
+                    else -> 0
+                }
+
+                if (nextX !in 0 until game.size || nextY !in 0 until game.size) {
+                    return@forEach
+                }
+
+                val nextPoint = nextX to nextY
+                val neighbor = gridMap[nextPoint] ?: return@forEach
+                val opposite = (port + 2) % 4
+                if (opposite in ports(neighbor) && energized.add(nextPoint)) {
+                    queue.add(nextPoint)
+                }
+            }
+        }
+
+        return energized
+    }
+
     fun connectedNeighborCount(game: RouterGameState, x: Int, y: Int): Int {
         val tile = game.grid.firstOrNull { it.x == x && it.y == y } ?: return 0
         var connected = 0
