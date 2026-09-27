@@ -469,6 +469,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val state = _gameState.value
                 if (isRuntimeActive() &&
                     state.activeRouterGame == null &&
+                    activeSignalValue == null &&
+                    _activeDialogue.value == null &&
                     (state.phase == GamePhase.ACTIVE_INVESTIGATION || state.phase == GamePhase.THE_INTERVIEW)) {
                     val breachCandidates = state.locations
                         .filter {
