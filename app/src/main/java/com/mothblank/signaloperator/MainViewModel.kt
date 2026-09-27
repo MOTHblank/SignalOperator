@@ -568,7 +568,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             containmentIntegrity = (state.containmentIntegrity + 3).coerceAtMost(100)
         )
         addLog("REINFORCED ${target.name}: +20 SECURITY / -10 THREAT.", LogType.ACTION)
-        soundManager.triggerHaptic("BUTTON_CLICK")
+        soundManager.playCommit()
+        showOperatorFeedback("${target.name} REINFORCED", FeedbackTone.POSITIVE)
         saveGame()
     }
 
@@ -606,6 +607,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             securityCharges = state.securityCharges - 2
         )
         addLog("RECOVERY ROUTE OPENED FOR ${target.name}. FIREWALL REPAIR REQUIRED.", LogType.ACTION)
+        showOperatorFeedback("RECOVERY ROUTE OPEN // ${target.name}", FeedbackTone.SYSTEM)
         startRouterGame(locationId)
         saveGame()
     }
@@ -893,6 +895,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             calibrationSynced = false
             _gameState.value = _gameState.value.copy(downloadProgress = 0f)
             addLog("SIGNAL LOST.", LogType.SYSTEM)
+            showOperatorFeedback("CARRIER LOST", FeedbackTone.NEGATIVE, 340L)
             stopRadioLoop()
             updateAudioParameters()
         } else if (!hasActiveLock) {
@@ -907,8 +910,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 
                 viewModelScope.launch {
                     delay(500)
-                    if (!isRuntimeActive() || lockedHotspot != activeHotspot) {
+                    val stillInCaptureRange =
+                        abs(frequencyValue - activeHotspot) < HotspotPlanner.LOCK_RANGE
+                    if (
+                        !isRuntimeActive() ||
+                        lockedHotspot != activeHotspot ||
+                        !stillInCaptureRange
+                    ) {
+                        if (lockedHotspot == activeHotspot) {
+                            lockedHotspot = null
+                        }
                         isScanning = false
+                        updateProximity()
+                        updateAudioParameters()
                         return@launch
                     }
                     val signal = engine.generateSignal(
@@ -1217,6 +1231,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val game = _gameState.value.activeRouterGame ?: return
         addLog("SECURITY BREACH: NODE CONTROL LOST.", LogType.ERROR)
         soundManager.playAlert()
+        showOperatorFeedback("NODE LOST // SECURITY COLLAPSE", FeedbackTone.NEGATIVE, 760L)
 
         val state = _gameState.value
         val updatedLocations = state.locations.map {
@@ -1277,7 +1292,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         routerCountdownJob?.cancel()
         val game = _gameState.value.activeRouterGame ?: return
         addLog("FIREWALL SYNC SUCCESSFUL. NODE SECURED.", LogType.ACTION)
-        soundManager.triggerHaptic("BUTTON_CLICK")
+        showOperatorFeedback("NODE SECURED // LINK RESTORED", FeedbackTone.POSITIVE, 700L)
 
         val state = _gameState.value
         val updatedLocations = state.locations.map {
