@@ -4,7 +4,9 @@ import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 
@@ -46,10 +48,16 @@ const val CRT_SHADER_SRC = """
 """
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-fun Modifier.crtEffect(time: Float, corruption: Float): Modifier = this.graphicsLayer {
-    val shader = RuntimeShader(CRT_SHADER_SRC)
-    shader.setFloatUniform("resolution", size.width, size.height)
-    shader.setFloatUniform("time", time)
-    shader.setFloatUniform("corruption", corruption)
-    renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "composable").asComposeRenderEffect()
+fun Modifier.crtEffect(time: Float, corruption: Float): Modifier = composed {
+    val shader = remember { RuntimeShader(CRT_SHADER_SRC) }
+    val effect = remember(shader) {
+        RenderEffect.createRuntimeShaderEffect(shader, "composable").asComposeRenderEffect()
+    }
+
+    this.graphicsLayer {
+        shader.setFloatUniform("resolution", size.width, size.height)
+        shader.setFloatUniform("time", time)
+        shader.setFloatUniform("corruption", corruption)
+        renderEffect = effect
+    }
 }
