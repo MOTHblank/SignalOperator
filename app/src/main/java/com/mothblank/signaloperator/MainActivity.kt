@@ -20,10 +20,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.mothblank.signaloperator.components.*
+import com.mothblank.signaloperator.models.FeedbackTone
 import com.mothblank.signaloperator.models.GamePhase
 import com.mothblank.signaloperator.models.MenuSubScreen
+import com.mothblank.signaloperator.models.OperatorFeedback
 import com.mothblank.signaloperator.ui.theme.SignalOperatorTheme
 import com.mothblank.signaloperator.ui.theme.*
 import androidx.core.view.WindowCompat
@@ -55,8 +59,10 @@ class MainActivity : ComponentActivity() {
                 onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
             }
 
-            val gameState     by viewModel.gameState.collectAsState()
-            val logs          by viewModel.logs.collectAsState()
+            val gameState by viewModel.gameState.collectAsState()
+            val logs by viewModel.logs.collectAsState()
+            val operatorFeedback by viewModel.operatorFeedback.collectAsState()
+            val bootStep by viewModel.bootStep.collectAsState()
             val signalRuntime by viewModel.signalRuntime.collectAsState()
             val activeSignal = signalRuntime.activeSignal
             val stability = signalRuntime.stability
