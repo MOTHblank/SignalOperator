@@ -195,4 +195,47 @@ class GameSessionReducerTest {
         assertEquals(GamePhase.ENDING_SEVERED, resolution.state.phase)
         assertEquals("SEVERED", resolution.highScore?.maxPhase)
     }
+    @Test
+    fun ignoredMissionStillAppliesUnderlyingWorldEvent() {
+        val current = GameState(
+            locations = listOf(Location("loc-1", "SITE ALPHA", 0.2f, 0.3f, security = 50))
+        )
+
+        val resolution = GameSessionReducer.resolveProcessedSignal(
+            current = current,
+            signal = signal,
+            currentHotspot = 99.1f,
+            action = "DISCARD",
+            solutionInput = ""
+        )
+
+        assertEquals(70, resolution.state.locations.single().threat)
+        assertEquals(LocationStatus.INVESTIGATING, resolution.state.locations.single().status)
+        assertEquals(1, resolution.state.ignoredSignals)
+    }
+
+    @Test
+    fun interviewDiscardIsRejectedByDomainReducer() {
+        val current = GameState(
+            phase = GamePhase.THE_INTERVIEW,
+            puzzlesSolved = 1,
+            puzzlesRequired = 3
+        )
+        val interviewSignal = signal.copy(
+            solution = "YES|NO|I CANNOT FEEL",
+            interaction = PuzzleInteraction.INTERVIEW_CHOICE,
+            outcome = null
+        )
+
+        val resolution = GameSessionReducer.resolveProcessedSignal(
+            current = current,
+            signal = interviewSignal,
+            currentHotspot = 101f,
+            action = "DISCARD",
+            solutionInput = ""
+        )
+
+        assertEquals(current, resolution.state)
+    }
+
 }
