@@ -277,6 +277,7 @@ fun StabilizerTuner(
     setFilter: (Int) -> Unit,
     color: Color,
     isLocked: Boolean = false,
+    stability: Float = 0f,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -284,6 +285,17 @@ fun StabilizerTuner(
             Text(
                 "GAIN / FILTER OFFLINE // ACQUIRE A CARRIER FIRST",
                 color = color.copy(alpha = 0.45f),
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(bottom = 2.dp)
+            )
+        } else {
+            Text(
+                if (stability >= 95f) {
+                    "CALIBRATION > PHASE SYNC // DECODER WINDOW OPEN"
+                } else {
+                    "CALIBRATION > SEEKING SYNC // TARGET 95%+"
+                },
+                color = color.copy(alpha = if (stability >= 95f) 0.95f else 0.58f),
                 style = MaterialTheme.typography.labelSmall,
                 modifier = Modifier.padding(bottom = 2.dp)
             )
