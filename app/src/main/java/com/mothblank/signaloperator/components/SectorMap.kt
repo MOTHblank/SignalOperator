@@ -1,5 +1,6 @@
 package com.mothblank.signaloperator.components
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -37,6 +38,41 @@ fun SectorMap(
 ) {
     var selectedLocationId by remember { mutableStateOf<String?>(null) }
     val selectedLocation = locations.firstOrNull { it.id == selectedLocationId }
+    var previousLocationState by remember {
+        mutableStateOf<Map<String, Triple<LocationStatus, Int, Int>>>(emptyMap())
+    }
+    var previousLinkState by remember {
+        mutableStateOf<Map<String, LinkStatus>>(emptyMap())
+    }
+    var changedLocationIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var changedLinkIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val networkPulse = remember { Animatable(0f) }
+
+    LaunchedEffect(locations, networkLinks) {
+        val currentLocations = locations.associate {
+            it.id to Triple(it.status, it.security, it.threat)
+        }
+        val currentLinks = networkLinks.associate { it.id to it.status }
+
+        if (previousLocationState.isNotEmpty() || previousLinkState.isNotEmpty()) {
+            changedLocationIds = currentLocations.keys.filterTo(mutableSetOf()) { id ->
+                previousLocationState[id] != currentLocations[id]
+            }
+            changedLinkIds = currentLinks.keys.filterTo(mutableSetOf()) { id ->
+                previousLinkState[id] != currentLinks[id]
+            }
+
+            if (changedLocationIds.isNotEmpty() || changedLinkIds.isNotEmpty()) {
+                networkPulse.snapTo(1f)
+                networkPulse.animateTo(0f, tween(560))
+                changedLocationIds = emptySet()
+                changedLinkIds = emptySet()
+            }
+        }
+
+        previousLocationState = currentLocations
+        previousLinkState = currentLinks
+    }
 
     BoxWithConstraints(
         modifier = modifier
@@ -70,9 +106,11 @@ fun SectorMap(
                 )
             }
 
+            val pulse = networkPulse.value
             networkLinks.forEach { link ->
                 val from = locationById[link.fromLocationId] ?: return@forEach
                 val to = locationById[link.toLocationId] ?: return@forEach
+                val changed = link.id in changedLinkIds
                 val linkColor = when (link.status) {
                     LinkStatus.ACTIVE -> color.copy(alpha = 0.35f)
                     LinkStatus.JAMMED -> Color.Yellow.copy(alpha = 0.55f)
@@ -82,7 +120,8 @@ fun SectorMap(
                     color = linkColor,
                     start = Offset(from.x * width, from.y * height),
                     end = Offset(to.x * width, to.y * height),
-                    strokeWidth = if (link.status == LinkStatus.ACTIVE) 2f else 3f,
+                    strokeWidth = (if (link.status == LinkStatus.ACTIVE) 2f else 3f) +
+                        if (changed) pulse * 4f else 0f,
                     pathEffect = if (link.status == LinkStatus.ACTIVE) {
                         null
                     } else {
@@ -95,6 +134,15 @@ fun SectorMap(
                 val nodeColor = nodeColor(loc.status, color)
                 val pressure = (loc.threat - loc.security).coerceAtLeast(0)
                 val center = Offset(loc.x * width, loc.y * height)
+
+                if (loc.id in changedLocationIds && pulse > 0f) {
+                    drawCircle(
+                        color = nodeColor.copy(alpha = pulse * 0.65f),
+                        radius = (16f + (1f - pulse) * 18f).dp.toPx(),
+                        center = center,
+                        style = Stroke(width = 1.5.dp.toPx())
+                    )
+                }
 
                 if (loc.id == selectedLocationId) {
                     drawCircle(
