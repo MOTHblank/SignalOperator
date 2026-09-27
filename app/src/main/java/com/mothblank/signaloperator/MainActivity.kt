@@ -57,12 +57,13 @@ class MainActivity : ComponentActivity() {
 
             val gameState     by viewModel.gameState.collectAsState()
             val logs          by viewModel.logs.collectAsState()
-            val activeSignal  by viewModel.activeSignal.collectAsState()
-            val stability     by viewModel.stability.collectAsState()
-            val proximity     by viewModel.proximity.collectAsState()
-            val frequency     by viewModel.frequency.collectAsState()
-            val gain          by viewModel.gain.collectAsState()
-            val filter        by viewModel.filter.collectAsState()
+            val signalRuntime by viewModel.signalRuntime.collectAsState()
+            val activeSignal = signalRuntime.activeSignal
+            val stability = signalRuntime.stability
+            val proximity = signalRuntime.proximity
+            val frequency = signalRuntime.frequency
+            val gain = signalRuntime.gain
+            val filter = signalRuntime.filter
             val activeDialogue by viewModel.activeDialogue.collectAsState()
             val currentDialogueIndex by viewModel.currentDialogueIndex.collectAsState()
 
