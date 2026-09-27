@@ -893,7 +893,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         var newStability = (100f - (totalDiff.toFloat())).coerceAtLeast(0f)
         
         if (_gameState.value.corruptionLevel > 0) {
-            newStability -= (Math.random() * (_gameState.value.corruptionLevel * 5)).toFloat()
+            val interferencePhase =
+                signal.id.hashCode() * 0.001f +
+                    gainValue * 0.071f +
+                    filterValue * 0.113f
+            val interference =
+                ((kotlin.math.sin(interferencePhase) + 1f) * 0.5f) *
+                    (_gameState.value.corruptionLevel * 5f)
+            newStability -= interference
         }
         
         stabilityValue = newStability.coerceIn(0f, 100f)
