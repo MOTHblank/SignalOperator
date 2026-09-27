@@ -9,7 +9,7 @@ import org.json.JSONObject
 object SaveStateManager {
     private const val PREFS_NAME = "signal_operator_save_state"
     private const val KEY_SAVE_DATA = "save_data"
-    private const val CURRENT_SCHEMA_VERSION = 3
+    private const val CURRENT_SCHEMA_VERSION = 4
 
     data class SavedData(
         val gameState: GameState,
@@ -90,6 +90,18 @@ object SaveStateManager {
                 linksArray.put(linkObj)
             }
             json.put("networkLinks", linksArray)
+
+            val knownArray = JSONArray()
+            state.knownFrequencies.forEach { known ->
+                val knownObj = JSONObject()
+                knownObj.put("frequency", known.frequency.toDouble())
+                knownObj.put("label", known.label)
+                knownObj.put("kind", known.kind.name)
+                knownObj.put("lastPhase", known.lastPhase.name)
+                knownObj.put("visits", known.visits)
+                knownArray.put(knownObj)
+            }
+            json.put("knownFrequencies", knownArray)
 
             // Logs
             val logsArray = JSONArray()
@@ -199,6 +211,27 @@ object SaveStateManager {
                 )
             }
 
+            val knownFrequencies = mutableListOf<KnownFrequency>()
+            val knownArray = json.optJSONArray("knownFrequencies")
+            if (knownArray != null) {
+                for (i in 0 until knownArray.length()) {
+                    val knownObj = knownArray.getJSONObject(i)
+                    knownFrequencies.add(
+                        KnownFrequency(
+                            frequency = knownObj.getDouble("frequency").toFloat(),
+                            label = knownObj.optString("label", "UNKNOWN"),
+                            kind = SignalKind.valueOf(
+                                knownObj.optString("kind", SignalKind.MISSION.name)
+                            ),
+                            lastPhase = GamePhase.valueOf(
+                                knownObj.optString("lastPhase", phase.name)
+                            ),
+                            visits = knownObj.optInt("visits", 1)
+                        )
+                    )
+                }
+            }
+
             // Logs
             val logs = mutableListOf<LogEntry>()
             val logsArray = json.getJSONArray("logs")
@@ -224,6 +257,7 @@ object SaveStateManager {
                 locations = locations,
                 characters = characters,
                 networkLinks = networkLinks,
+                knownFrequencies = knownFrequencies,
                 trustInEcho = trustInEcho,
                 exposure = exposure,
                 containmentIntegrity = containmentIntegrity,
