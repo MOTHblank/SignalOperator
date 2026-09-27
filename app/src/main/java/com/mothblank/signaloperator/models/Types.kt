@@ -23,6 +23,44 @@ enum class SignalKind {
     DEAD_DROP
 }
 
+enum class Urgency {
+    ROUTINE,
+    ELEVATED,
+    HIGH,
+    CRITICAL
+}
+
+enum class WorldEffectType {
+    ADD_LOCATION_THREAT,
+    ADD_LOCATION_SECURITY,
+    MARK_LOCATION_INVESTIGATING,
+    MOVE_CHARACTER,
+    SET_CHARACTER_ACTIVE,
+    SET_CHARACTER_MIA,
+    SET_CHARACTER_COMPROMISED,
+    ADD_TRUST,
+    ADD_EXPOSURE,
+    ADD_CONTAINMENT,
+    ADD_SECURITY_CHARGES
+}
+
+data class WorldEffect(
+    val type: WorldEffectType,
+    val targetId: String? = null,
+    val amount: Int = 0,
+    val destinationId: String? = null
+)
+
+data class SignalOutcome(
+    val eventId: String,
+    val briefing: String,
+    val urgency: Urgency = Urgency.ROUTINE,
+    val locationId: String? = null,
+    val actorId: String? = null,
+    val intelValue: Int = 1,
+    val effects: List<WorldEffect> = emptyList()
+)
+
 data class SignalData(
     val id: String,
     val frequency: Float,
@@ -36,7 +74,8 @@ data class SignalData(
     val sender: String,
     val isAnomalous: Boolean,
     val metadata: String,
-    val kind: SignalKind = SignalKind.MISSION
+    val kind: SignalKind = SignalKind.MISSION,
+    val outcome: SignalOutcome? = null
 )
 
 data class SignalRuntimeState(
@@ -64,7 +103,9 @@ data class Location(
     val name: String,
     val x: Float,
     val y: Float,
-    val status: LocationStatus = LocationStatus.SECURE
+    val status: LocationStatus = LocationStatus.SECURE,
+    val security: Int = 50,
+    val threat: Int = 0
 )
 
 enum class LocationStatus {
@@ -81,6 +122,17 @@ data class Character(
 enum class CharacterStatus {
     ACTIVE, MIA, COMPROMISED, ANOMALY
 }
+
+enum class LinkStatus {
+    ACTIVE, JAMMED, CORRUPTED
+}
+
+data class NetworkLink(
+    val id: String,
+    val fromLocationId: String,
+    val toLocationId: String,
+    val status: LinkStatus = LinkStatus.ACTIVE
+)
 
 enum class MenuSubScreen {
     MAIN,
@@ -100,6 +152,15 @@ data class GameState(
     val solvedHotspots: Set<Float> = emptySet(),
     val locations: List<Location> = emptyList(),
     val characters: List<Character> = emptyList(),
+    val networkLinks: List<NetworkLink> = emptyList(),
+    val trustInEcho: Int = 50,
+    val exposure: Int = 0,
+    val containmentIntegrity: Int = 100,
+    val securityCharges: Int = 1,
+    val deadDropsRecovered: Int = 0,
+    val routineBroadcastsCleared: Int = 0,
+    val breachesPrevented: Int = 0,
+    val endingSummary: String? = null,
     val isMapViewActive: Boolean = false,
     val activeRouterGame: RouterGameState? = null,
     val selectedLogEntry: LogEntry? = null,
@@ -124,7 +185,7 @@ data class RouterTile(
     val x: Int,
     val y: Int,
     val type: TilePath,
-    val rotationDegrees: Int // 0, 90, 180, 270
+    val rotationDegrees: Int
 )
 
 data class RouterGameState(
