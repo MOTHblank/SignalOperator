@@ -127,6 +127,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
     val logs: StateFlow<List<LogEntry>> = _logs.asStateFlow()
 
+    private val _operatorFeedback = MutableStateFlow<OperatorFeedback?>(null)
+    val operatorFeedback: StateFlow<OperatorFeedback?> = _operatorFeedback.asStateFlow()
+
+    private val _bootStep = MutableStateFlow<Int?>(null)
+    val bootStep: StateFlow<Int?> = _bootStep.asStateFlow()
+
     private val _activeDialogue = MutableStateFlow<List<DialogueLine>?>(null)
     val activeDialogue: StateFlow<List<DialogueLine>?> = _activeDialogue.asStateFlow()
 
@@ -419,7 +425,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _logs.value = emptyList()
         addLog("SYSTEM INITIALIZED. SCANNER STANDBY.", LogType.SYSTEM)
         saveGame()
-        triggerDialogue(getIntroDialogue())
+        runBootSequence {
+            triggerDialogue(getIntroDialogue())
+        }
     }
 
     fun continueGame() {
@@ -779,6 +787,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _logs.value = _logs.value + entry
     }
 
+    private fun showOperatorFeedback(
+        text: String,
+        tone: FeedbackTone,
+        durationMillis: Long = 520L
+    ) {
+        val feedback = OperatorFeedback(
+            id = UUID.randomUUID().toString(),
+            text = text,
+            tone = tone
+        )
+        _operatorFeedback.value = feedback
+        viewModelScope.launch {
+            delay(durationMillis)
+            if (_operatorFeedback.value?.id == feedback.id) {
+                _operatorFeedback.value = null
+            }
+        }
+    }
+
+    private fun runBootSequence(onComplete: () -> Unit) {
+        viewModelScope.launch {
+            for (step in 0..3) {
+                _bootStep.value = step
+                delay(if (step == 3) 180L else 210L)
+            }
+            _bootStep.value = null
+            onComplete()
+        }
+    }
+
     private fun rememberFrequency(signal: SignalData) {
         val state = _gameState.value
         val known = state.knownFrequencies.toMutableList()
@@ -998,6 +1036,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         if (action == "COMMIT") {
             soundManager.playCommit()
+            showOperatorFeedback(
+                text = when (signal.kind) {
+                    SignalKind.MISSION -> "INTEL ARCHIVED"
+                    SignalKind.DEAD_DROP -> "TELEMETRY RECOVERED"
+                    SignalKind.MUNDANE_BROADCAST -> "CARRIER CLASSIFICATION ERROR"
+                },
+                tone = if (signal.kind == SignalKind.MUNDANE_BROADCAST) {
+                    FeedbackTone.NEGATIVE
+                } else {
+                    FeedbackTone.POSITIVE
+                }
+            )
             when (signal.kind) {
                 SignalKind.MISSION -> {
                     addLog("TRANSMISSION SUCCESSFUL. INTEL LOGGED.", LogType.ACTION)
@@ -1016,6 +1066,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         } else {
             soundManager.playDiscard()
+            showOperatorFeedback(
+                text = when (signal.kind) {
+                    SignalKind.MISSION -> "MISSION TRAFFIC DROPPED"
+                    SignalKind.DEAD_DROP -> "TELEMETRY PURGED"
+                    SignalKind.MUNDANE_BROADCAST -> "CIVILIAN BAND CLEARED"
+                },
+                tone = if (signal.kind == SignalKind.MISSION) {
+                    FeedbackTone.NEGATIVE
+                } else {
+                    FeedbackTone.SYSTEM
+                }
+            )
             when (signal.kind) {
                 SignalKind.MISSION -> addLog("MISSION TRAFFIC DELIBERATELY IGNORED.", LogType.ERROR)
                 SignalKind.DEAD_DROP -> addLog("KERNEL TELEMETRY DISCARDED.", LogType.ACTION)
