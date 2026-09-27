@@ -757,14 +757,16 @@ fun Decoder(
                             )
                         }
                     }
-                    Button(
-                        onClick = { onAction("DISCARD", input) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-                    ) {
-                        Text(
-                            if (signal.kind == SignalKind.MUNDANE_BROADCAST) "CLEAR CIVILIAN BAND" else "DISCARD",
-                            color = Color.White
-                        )
+                    if (signal.interaction != PuzzleInteraction.INTERVIEW_CHOICE) {
+                        Button(
+                            onClick = { onAction("DISCARD", input) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+                        ) {
+                            Text(
+                                if (signal.kind == SignalKind.MUNDANE_BROADCAST) "CLEAR CIVILIAN BAND" else "DISCARD",
+                                color = Color.White
+                            )
+                        }
                     }
                 }
                 
