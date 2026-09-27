@@ -133,6 +133,17 @@ class MainActivity : ComponentActivity() {
                             currentColor = currentColor
                         )
                     } else {
+                        bootStep?.let { step ->
+                            BootSequenceOverlay(step = step, color = currentColor)
+                        }
+
+                        operatorFeedback?.let { feedback ->
+                            OperatorFeedbackOverlay(
+                                feedback = feedback,
+                                color = currentColor
+                            )
+                        }
+
                         activeDialogue?.let { dialogueLines ->
                             DialogueOverlay(
                                 dialogue = dialogueLines,
@@ -377,6 +388,81 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             // Prevent crashes if the window/decorView or system insets controller is not fully initialized yet
         }
+    }
+}
+
+@Composable
+private fun BootSequenceOverlay(
+    step: Int,
+    color: Color
+) {
+    val lines = listOf(
+        "POWER BUS ........ NOMINAL",
+        "RF FRONT-END ..... ONLINE",
+        "DECODER BUFFER ... CLEARED",
+        "OPERATOR LINK .... READY"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(30f)
+            .background(Color.Black),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.82f)
+                .border(1.dp, color.copy(alpha = 0.45f))
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Text(
+                "B.A.R. SIGNAL OPERATIONS TERMINAL",
+                color = color,
+                style = MaterialTheme.typography.titleMedium
+            )
+            HorizontalDivider(color = color.copy(alpha = 0.3f))
+            lines.forEachIndexed { index, line ->
+                Text(
+                    if (index <= step) "> $line" else "  ${line.substringBefore(" ....")} ........",
+                    color = color.copy(alpha = if (index <= step) 0.9f else 0.25f),
+                    fontFamily = FontFamily.Monospace,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OperatorFeedbackOverlay(
+    feedback: OperatorFeedback,
+    color: Color
+) {
+    val feedbackColor = when (feedback.tone) {
+        FeedbackTone.POSITIVE -> color
+        FeedbackTone.NEGATIVE -> Color.Red
+        FeedbackTone.SYSTEM -> color.copy(alpha = 0.75f)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(12f)
+            .padding(top = 76.dp),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Text(
+            text = feedback.text,
+            color = feedbackColor,
+            fontFamily = FontFamily.Monospace,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier
+                .background(Color.Black.copy(alpha = 0.92f))
+                .border(1.dp, feedbackColor.copy(alpha = 0.7f))
+                .padding(horizontal = 14.dp, vertical = 7.dp)
+        )
     }
 }
 
