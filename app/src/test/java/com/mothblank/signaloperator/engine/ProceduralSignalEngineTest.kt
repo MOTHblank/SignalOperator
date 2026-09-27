@@ -2,6 +2,7 @@ package com.mothblank.signaloperator.engine
 
 import com.mothblank.signaloperator.models.GamePhase
 import com.mothblank.signaloperator.models.PuzzleType
+import com.mothblank.signaloperator.models.SignalKind
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -56,4 +57,49 @@ class ProceduralSignalEngineTest {
             }
         }
     }
+    @Test
+    fun specialSignalsKeepTheirClassificationInActiveInvestigation() {
+        val systemData = SystemData(
+            batteryLevel = 67,
+            deviceModel = "TEST-DEVICE",
+            currentTime = "12:34:56"
+        )
+
+        val deadDrop = (0L..10_000L)
+            .asSequence()
+            .map { seed ->
+                engine.generateSignal(
+                    SignalRequest(
+                        phase = GamePhase.ACTIVE_INVESTIGATION,
+                        frequency = 97.1f,
+                        seed = seed,
+                        systemData = systemData
+                    )
+                )
+            }
+            .first { it.kind == SignalKind.DEAD_DROP }
+
+        assertEquals(SignalKind.DEAD_DROP, deadDrop.kind)
+        assertTrue(deadDrop.metadata.startsWith("TYPE: REAL-WORLD INTERCEPT"))
+        assertEquals("VERIFY SYSTEM TELEMETRY", deadDrop.objective)
+
+        val mundane = (0L..10_000L)
+            .asSequence()
+            .map { seed ->
+                engine.generateSignal(
+                    SignalRequest(
+                        phase = GamePhase.ACTIVE_INVESTIGATION,
+                        frequency = 99.3f,
+                        seed = seed,
+                        systemData = systemData
+                    )
+                )
+            }
+            .first { it.kind == SignalKind.MUNDANE_BROADCAST }
+
+        assertEquals(SignalKind.MUNDANE_BROADCAST, mundane.kind)
+        assertTrue(mundane.metadata.startsWith("TYPE: PUBLIC BAND"))
+        assertEquals("IDENTIFY NON-ESSENTIAL BROADCAST", mundane.objective)
+    }
+
 }
