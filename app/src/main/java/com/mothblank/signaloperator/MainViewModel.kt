@@ -156,6 +156,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadSettings()
+        soundManager.setEffectsEnabled(_gameState.value.isSoundEnabled)
         val saved = SaveStateManager.loadGame(application)
         _hasSavedGame.value = saved != null
 
@@ -289,6 +290,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleSound() {
         val newVal = !_gameState.value.isSoundEnabled
         _gameState.value = _gameState.value.copy(isSoundEnabled = newVal)
+        soundManager.setEffectsEnabled(newVal)
         saveSetting(KEY_SOUND, newVal)
         if (newVal) {
             soundManager.startStatic()
@@ -348,6 +350,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isSoundEnabled = true,
             isTtsEnabled = true
         )
+        soundManager.setEffectsEnabled(true)
         initializeWorld()
         generateHotspots(_gameState.value.phase, _gameState.value.seed, _gameState.value.puzzlesRequired)
 
