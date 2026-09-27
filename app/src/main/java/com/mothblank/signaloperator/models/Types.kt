@@ -78,6 +78,14 @@ data class SignalData(
     val outcome: SignalOutcome? = null
 )
 
+data class KnownFrequency(
+    val frequency: Float,
+    val label: String,
+    val kind: SignalKind,
+    val lastPhase: GamePhase,
+    val visits: Int = 1
+)
+
 data class SignalRuntimeState(
     val frequency: Float = 88f,
     val gain: Int = 50,
@@ -153,6 +161,7 @@ data class GameState(
     val locations: List<Location> = emptyList(),
     val characters: List<Character> = emptyList(),
     val networkLinks: List<NetworkLink> = emptyList(),
+    val knownFrequencies: List<KnownFrequency> = emptyList(),
     val trustInEcho: Int = 50,
     val exposure: Int = 0,
     val containmentIntegrity: Int = 100,
