@@ -285,10 +285,18 @@ fun SectorMap(
                     shape = MaterialTheme.shapes.extraSmall
                 ) {
                     Text(
-                        if (canAct) actionLabel else when (selected.status) {
-                            LocationStatus.SECURE -> "NODE ALREADY HARDENED"
-                            LocationStatus.CORRUPTED -> "INSUFFICIENT SECURITY CHARGES"
-                            else -> actionLabel
+                        if (canAct) {
+                            actionLabel
+                        } else {
+                            when (selected.status) {
+                                LocationStatus.SECURE -> if (securityCharges < 1) {
+                                    "INSUFFICIENT SECURITY CHARGES"
+                                } else {
+                                    "NODE ALREADY HARDENED"
+                                }
+                                LocationStatus.CORRUPTED -> "INSUFFICIENT SECURITY CHARGES"
+                                LocationStatus.INVESTIGATING -> actionLabel
+                            }
                         },
                         fontFamily = FontFamily.Monospace,
                         fontSize = 10.sp
