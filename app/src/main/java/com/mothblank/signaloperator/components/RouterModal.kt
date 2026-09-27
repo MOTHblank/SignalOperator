@@ -25,6 +25,7 @@ import com.mothblank.signaloperator.models.TilePath
 @Composable
 fun RouterModal(
     game: RouterGameState,
+    locationName: String,
     color: Color,
     onRotateTile: (Int, Int) -> Unit,
     onClose: () -> Unit,
@@ -48,7 +49,7 @@ fun RouterModal(
             )
             
             Text(
-                text = "SECURE RELAY FOR NODE [ ${game.locationId.uppercase()} ]",
+                text = "SECURE RELAY FOR NODE [ ${locationName.uppercase()} ]",
                 color = color,
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -69,6 +70,12 @@ fun RouterModal(
                     style = MaterialTheme.typography.titleLarge
                 )
             }
+
+            Text(
+                text = "ROTATE TILES TO BUILD A CONTINUOUS PATH FROM THE LEFT INPUT TO THE RIGHT OUTPUT.",
+                color = color.copy(alpha = 0.65f),
+                style = MaterialTheme.typography.labelSmall
+            )
 
             // Grid rendering
             val tileMap = game.grid.associateBy { it.x to it.y }
@@ -134,11 +141,16 @@ fun RouterModal(
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            Text(
+                text = "ABORTING CONCEDES THE NODE TO THE BREACH.",
+                color = Color.Red.copy(alpha = 0.75f),
+                style = MaterialTheme.typography.labelSmall
+            )
             Button(
                 onClick = onClose,
                 colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
             ) {
-                Text("ABORT ATTEMPT", color = Color.White)
+                Text("ABORT // CONCEDE NODE", color = Color.White)
             }
         }
     }
