@@ -8,6 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -340,8 +342,9 @@ class MainActivity : ComponentActivity() {
                                     StabilizerTuner(
                                         gain     = gain,   setGain   = { viewModel.setGain(it) },
                                         filter   = filter, setFilter = { viewModel.setFilter(it) },
-                                        color    = currentColor,
-                                        isLocked = activeSignal != null
+                                        color = currentColor,
+                                        isLocked = activeSignal != null,
+                                        stability = stability
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Decoder(
@@ -413,7 +416,11 @@ private fun BootSequenceOverlay(
         modifier = Modifier
             .fillMaxSize()
             .zIndex(30f)
-            .background(Color.Black),
+            .background(Color.Black)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {},
         contentAlignment = Alignment.Center
     ) {
         Column(
