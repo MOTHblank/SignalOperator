@@ -311,6 +311,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         soundManager.playClick()
     }
 
+    fun playTypewriterTick() {
+        soundManager.playTypewriterTick()
+    }
+
     fun playAlert() {
         soundManager.playAlert()
     }
