@@ -147,7 +147,7 @@ object SaveStateManager {
             val deadDropsRecovered = json.optInt("deadDropsRecovered", 0)
             val routineBroadcastsCleared = json.optInt("routineBroadcastsCleared", 0)
             val breachesPrevented = json.optInt("breachesPrevented", 0)
-            val endingSummary = if (json.isNull("endingSummary")) null else json.optString("endingSummary", null)
+            val endingSummary = json.optString("endingSummary", "").takeIf { it.isNotBlank() }
 
             // Hotspots
             val solvedHotspots = mutableSetOf<Float>()
