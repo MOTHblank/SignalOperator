@@ -17,6 +17,7 @@ import java.io.FileOutputStream
 import java.io.DataOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicReference
 
 class SoundManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.Default + Job())
@@ -36,17 +37,19 @@ class SoundManager(private val context: Context) {
     private var clickSoundId = -1
     private var alertSoundId = -1
 
+    private data class AudioParameters(
+        val staticVolume: Float = 0.5f,
+        val staticPitch: Float = 1.0f,
+        val stability: Float = 0f,
+        val heterodyneVolume: Float = 0f,
+        val heterodyneFrequency: Float = 1000f,
+        val droneVolume: Float = 0f
+    )
+
     // Static Noise System (Procedural)
     private var staticTrack: AudioTrack? = null
-    private var isStaticRunning = false
-    private var staticVolume = 0.5f
-    private var staticPitch = 1.0f
-    private var stability = 0f
-
-    // Heterodyne & Drone Synthesizer parameters
-    private var heterodyneVol = 0f
-    private var heterodyneFreq = 1000f
-    private var droneVol = 0f
+    private var staticJob: Job? = null
+    private val audioParameters = AtomicReference(AudioParameters())
 
     // Voice System
     private var voiceTrack: AudioTrack? = null
@@ -168,11 +171,10 @@ class SoundManager(private val context: Context) {
     }
 
     fun startStatic() {
-        if (isStaticRunning) return
-        isStaticRunning = true
+        if (staticJob?.isActive == true) return
         staticTrack?.play()
-        
-        scope.launch {
+
+        staticJob = scope.launch {
             val sampleRate = 44100
             val bufferSize = 4096
             val buffer = ShortArray(bufferSize)
@@ -183,14 +185,12 @@ class SoundManager(private val context: Context) {
             var lfoPhase = 0.0
             val random = kotlin.random.Random.Default
 
-            while (isStaticRunning) {
-                // Dynamic parameters derived from stability
-                // High stability (90+) -> Subtle crackle
-                // Low stability -> Heavy roaring white noise
-                val noiseIntensity = ((100f - stability) / 100f).coerceIn(0.02f, 1f)
-                val currentHeterodyneVol = heterodyneVol
-                val currentHeterodyneFreq = heterodyneFreq
-                val currentDroneVol = droneVol
+            while (isActive) {
+                val params = audioParameters.get()
+                val noiseIntensity = ((100f - params.stability) / 100f).coerceIn(0.02f, 1f)
+                val currentHeterodyneVol = params.heterodyneVolume
+                val currentHeterodyneFreq = params.heterodyneFrequency
+                val currentDroneVol = params.droneVolume
                 
                 for (i in buffer.indices) {
                     // White noise
@@ -202,7 +202,7 @@ class SoundManager(private val context: Context) {
                     
                     // Mix white and brown based on pitch (tuning)
                     // Lower pitch -> More brown (low frequency roar)
-                    val noiseMix = (white * (staticPitch - 0.5f) + brown * (2.0f - staticPitch)).coerceIn(-1.0, 1.0)
+                    val noiseMix = (white * (params.staticPitch - 0.5f) + brown * (2.0f - params.staticPitch)).coerceIn(-1.0, 1.0)
                     
                     // Heterodyne Whistle
                     val whistle = sin(heterodynePhase) * currentHeterodyneVol
@@ -227,7 +227,7 @@ class SoundManager(private val context: Context) {
                     if (dronePhase2 > 2.0 * Math.PI) dronePhase2 -= 2.0 * Math.PI
                     if (lfoPhase > 2.0 * Math.PI) lfoPhase -= 2.0 * Math.PI
                     
-                    val combined = (noiseMix * noiseIntensity * staticVolume) + whistle + droneMix
+                    val combined = (noiseMix * noiseIntensity * params.staticVolume) + whistle + droneMix
                     buffer[i] = (combined * 32767).toInt().coerceIn(-32768, 32767).toShort()
                 }
                 staticTrack?.write(buffer, 0, buffer.size)
@@ -237,23 +237,45 @@ class SoundManager(private val context: Context) {
     }
 
     fun stopStatic() {
-        isStaticRunning = false
-        staticTrack?.stop()
+        staticJob?.cancel()
+        staticJob = null
+        staticTrack?.pause()
+        staticTrack?.flush()
+    }
+
+    private inline fun updateAudioParameters(
+        transform: (AudioParameters) -> AudioParameters
+    ) {
+        while (true) {
+            val current = audioParameters.get()
+            val updated = transform(current)
+            if (audioParameters.compareAndSet(current, updated)) return
+        }
     }
 
     fun updateStaticParameters(volume: Float, pitch: Float, stability: Float) {
-        staticVolume = volume.coerceIn(0f, 1f)
-        staticPitch = pitch.coerceIn(0.5f, 2.0f)
-        this.stability = stability.coerceIn(0f, 100f)
+        updateAudioParameters {
+            it.copy(
+                staticVolume = volume.coerceIn(0f, 1f),
+                staticPitch = pitch.coerceIn(0.5f, 2.0f),
+                stability = stability.coerceIn(0f, 100f)
+            )
+        }
     }
 
     fun updateHeterodyne(volume: Float, frequency: Float) {
-        heterodyneVol = volume.coerceIn(0f, 0.2f)
-        heterodyneFreq = frequency.coerceIn(50f, 3000f)
+        updateAudioParameters {
+            it.copy(
+                heterodyneVolume = volume.coerceIn(0f, 0.2f),
+                heterodyneFrequency = frequency.coerceIn(50f, 3000f)
+            )
+        }
     }
 
     fun updateDroneVolume(vol: Float) {
-        droneVol = vol.coerceIn(0f, 0.35f)
+        updateAudioParameters {
+            it.copy(droneVolume = vol.coerceIn(0f, 0.35f))
+        }
     }
 
     fun playVoice(samples: FloatArray, sampleRate: Int, isAnomalous: Boolean = true) {
@@ -277,9 +299,10 @@ class SoundManager(private val context: Context) {
             .setTransferMode(AudioTrack.MODE_STATIC)
             .build()
 
-        // Apply "distortion" based on stability and anomalous status
+        // Apply "distortion" from one coherent parameter snapshot.
         val processedSamples = FloatArray(samples.size)
-        
+        val stability = audioParameters.get().stability
+
         // Anomalous signals get more garbled/noisy
         // Mundane signals are clearer but still have radio crunch
         val baselineNoise = if (isAnomalous) 0.05f else 0.02f
@@ -405,22 +428,25 @@ class SoundManager(private val context: Context) {
     }
 
     fun pause() {
-        if (isStaticRunning) {
+        if (staticJob?.isActive == true) {
             staticTrack?.pause()
         }
         voiceTrack?.pause()
     }
 
     fun resume() {
-        if (isStaticRunning) {
+        if (staticJob?.isActive == true) {
             staticTrack?.play()
         }
-        // Voice track usually doesn't need resuming as it's static/short
     }
 
     fun release() {
-        isStaticRunning = false
+        staticJob?.cancel()
+        staticJob = null
         staticTrack?.release()
+        staticTrack = null
+        voiceTrack?.release()
+        voiceTrack = null
         soundPool.release()
         scope.cancel()
     }
