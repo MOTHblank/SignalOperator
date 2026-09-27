@@ -63,7 +63,6 @@ class MainActivity : ComponentActivity() {
             val frequency     by viewModel.frequency.collectAsState()
             val gain          by viewModel.gain.collectAsState()
             val filter        by viewModel.filter.collectAsState()
-            val isMapViewActive by viewModel.isMapViewActive.collectAsState()
             val activeDialogue by viewModel.activeDialogue.collectAsState()
             val currentDialogueIndex by viewModel.currentDialogueIndex.collectAsState()
 
@@ -91,7 +90,7 @@ class MainActivity : ComponentActivity() {
                         activeHint = null
                     } else if (gameState.selectedLogEntry != null) {
                         viewModel.selectLogEntry(null)
-                    } else if (isMapViewActive) {
+                    } else if (gameState.isMapViewActive) {
                         viewModel.toggleMapView()
                     } else if (gameState.activeRouterGame != null) {
                         viewModel.closeRouterGame()
@@ -233,7 +232,7 @@ class MainActivity : ComponentActivity() {
                             
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(onClick = { viewModel.toggleMapView() }) {
-                                    Icon(Icons.Default.Place, "Map", tint = if (isMapViewActive) Color.White else currentColor)
+                                    Icon(Icons.Default.Place, "Map", tint = if (gameState.isMapViewActive) Color.White else currentColor)
                                 }
                             }
                         }
@@ -273,7 +272,7 @@ class MainActivity : ComponentActivity() {
                                 .padding(top = 8.dp),
                             contentAlignment = Alignment.TopStart
                         ) {
-                            if (isMapViewActive) {
+                            if (gameState.isMapViewActive) {
                                 SectorMap(
                                     locations  = gameState.locations,
                                     characters = gameState.characters,
