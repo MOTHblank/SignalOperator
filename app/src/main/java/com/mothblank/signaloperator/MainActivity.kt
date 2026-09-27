@@ -109,20 +109,9 @@ class MainActivity : ComponentActivity() {
                 else                           -> CrtGreen
             }
 
-            val infiniteTransition = rememberInfiniteTransition(label = "time")
-            val time by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue  = 100f,
-                animationSpec = infiniteRepeatable(
-                    animation  = tween(100000, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart
-                ),
-                label = "time"
-            )
-
             var baseModifier = Modifier.fillMaxSize()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && gameState.isCrtEffectEnabled) {
-                baseModifier = baseModifier.crtEffect(time, gameState.corruptionLevel)
+                baseModifier = baseModifier.crtEffect(gameState.corruptionLevel)
             }
 
             SignalOperatorTheme {
@@ -257,7 +246,6 @@ class MainActivity : ComponentActivity() {
                             activeSignal = activeSignal,
                             gain      = gain,
                             filter    = filter,
-                            time      = time,
                             modifier  = Modifier.height(48.dp).fillMaxWidth()
                         )
                         FrequencyTuner(
