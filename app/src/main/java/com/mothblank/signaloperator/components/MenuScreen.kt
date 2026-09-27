@@ -415,6 +415,7 @@ fun HighscoresLayout(
     Column(
         modifier = Modifier
             .fillMaxWidth(0.9f)
+            .fillMaxHeight(0.85f)
             .border(1.dp, color)
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -501,6 +502,7 @@ fun HelpLayout(
     Column(
         modifier = Modifier
             .fillMaxWidth(0.9f)
+            .fillMaxHeight(0.85f)
             .border(1.dp, color)
             .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally
