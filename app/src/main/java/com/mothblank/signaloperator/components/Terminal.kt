@@ -36,8 +36,18 @@ fun Terminal(
         .padding(8.dp)
     ) {
         LazyColumn(reverseLayout = true) {
-            items(logs.reversed()) { log ->
-                TerminalRow(log = log, color = color, onClick = { onLogClick(log) })
+            if (logs.isEmpty()) {
+                item {
+                    Text(
+                        "[--:--:--] SESSION LOG EMPTY.",
+                        color = color.copy(alpha = 0.42f),
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            } else {
+                items(logs.reversed()) { log ->
+                    TerminalRow(log = log, color = color, onClick = { onLogClick(log) })
+                }
             }
         }
     }
