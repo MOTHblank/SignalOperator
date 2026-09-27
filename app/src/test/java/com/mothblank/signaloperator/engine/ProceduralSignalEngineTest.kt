@@ -153,7 +153,7 @@ class ProceduralSignalEngineTest {
 
         assertEquals(SignalKind.DEAD_DROP, signal.kind)
         assertNotNull(signal.outcome)
-        assertTrue(signal.outcome!!.effects.any { it.type.name == "ADD_SECURITY_CHARGES" })
+        assertTrue(signal.outcome!!.commitEffects.any { it.type.name == "ADD_SECURITY_CHARGES" })
     }
 
 }
