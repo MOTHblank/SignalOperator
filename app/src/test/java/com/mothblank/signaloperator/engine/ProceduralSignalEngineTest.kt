@@ -3,6 +3,10 @@ package com.mothblank.signaloperator.engine
 import com.mothblank.signaloperator.models.GamePhase
 import com.mothblank.signaloperator.models.PuzzleType
 import com.mothblank.signaloperator.models.SignalKind
+import com.mothblank.signaloperator.models.GameState
+import com.mothblank.signaloperator.models.Location
+import com.mothblank.signaloperator.models.Character
+import com.mothblank.signaloperator.models.CharacterStatus
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -100,6 +104,56 @@ class ProceduralSignalEngineTest {
         assertEquals(SignalKind.MUNDANE_BROADCAST, mundane.kind)
         assertTrue(mundane.metadata.startsWith("TYPE: PUBLIC BAND"))
         assertEquals("IDENTIFY NON-ESSENTIAL BROADCAST", mundane.objective)
+    }
+
+    @Test
+    fun missionSignalsCarryStructuredWorldOutcomes() {
+        val world = GameState(
+            phase = GamePhase.LIVE_INTRUSION,
+            locations = listOf(
+                Location("loc-1", "SITE ALPHA", 0.2f, 0.3f),
+                Location("loc-2", "SECTOR 4 RELAY", 0.5f, 0.5f),
+                Location("loc-3", "ALPHA OUTPOST", 0.8f, 0.2f),
+                Location("loc-4", "EXCLUSION ZONE", 0.6f, 0.8f)
+            ),
+            characters = listOf(
+                Character("char-1", "ECHO-ACTUAL", "loc-1"),
+                Character("char-2", "ECHO-2", "loc-3", CharacterStatus.ACTIVE)
+            )
+        )
+
+        val signal = engine.generateSignal(
+            SignalRequest(
+                phase = GamePhase.LIVE_INTRUSION,
+                frequency = 96.4f,
+                seed = 814L,
+                solvedPuzzlesCount = 1,
+                requestedKind = SignalKind.MISSION,
+                worldState = world
+            )
+        )
+
+        assertEquals(SignalKind.MISSION, signal.kind)
+        assertNotNull(signal.outcome)
+        assertTrue(signal.outcome!!.effects.isNotEmpty())
+        assertNotNull(signal.outcome!!.briefing)
+    }
+
+    @Test
+    fun deadDropOutcomeRewardsStrategicResources() {
+        val signal = engine.generateSignal(
+            SignalRequest(
+                phase = GamePhase.ACTIVE_INVESTIGATION,
+                frequency = 97.1f,
+                seed = 23L,
+                systemData = SystemData(67, "TEST", "12:00:00"),
+                requestedKind = SignalKind.DEAD_DROP
+            )
+        )
+
+        assertEquals(SignalKind.DEAD_DROP, signal.kind)
+        assertNotNull(signal.outcome)
+        assertTrue(signal.outcome!!.effects.any { it.type.name == "ADD_SECURITY_CHARGES" })
     }
 
 }
