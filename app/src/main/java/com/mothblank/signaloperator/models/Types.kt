@@ -39,6 +39,15 @@ data class SignalData(
     val kind: SignalKind = SignalKind.MISSION
 )
 
+data class SignalRuntimeState(
+    val frequency: Float = 88f,
+    val gain: Int = 50,
+    val filter: Int = 50,
+    val activeSignal: SignalData? = null,
+    val stability: Float = 0f,
+    val proximity: Float = 0f
+)
+
 data class LogEntry(
     val id: String,
     val timestamp: String,
