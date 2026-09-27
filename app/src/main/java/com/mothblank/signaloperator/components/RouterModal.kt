@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.mothblank.signaloperator.models.RouterGameState
 import com.mothblank.signaloperator.models.RouterTile
 import com.mothblank.signaloperator.models.TilePath
@@ -34,6 +35,7 @@ fun RouterModal(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .zIndex(15f)
             .background(Color.Black.copy(alpha = 0.96f))
             .padding(horizontal = 12.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center
