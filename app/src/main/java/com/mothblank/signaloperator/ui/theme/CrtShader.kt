@@ -4,6 +4,13 @@ import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -48,7 +55,17 @@ const val CRT_SHADER_SRC = """
 """
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-fun Modifier.crtEffect(time: Float, corruption: Float): Modifier = composed {
+fun Modifier.crtEffect(corruption: Float): Modifier = composed {
+    val transition = rememberInfiniteTransition(label = "crt-time")
+    val time by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 100f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(100000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "crt-time-value"
+    )
     val shader = remember { RuntimeShader(CRT_SHADER_SRC) }
     val effect = remember(shader) {
         RenderEffect.createRuntimeShaderEffect(shader, "composable").asComposeRenderEffect()
