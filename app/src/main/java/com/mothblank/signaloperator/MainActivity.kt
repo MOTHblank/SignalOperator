@@ -91,10 +91,10 @@ class MainActivity : ComponentActivity() {
                         activeHint = null
                     } else if (gameState.selectedLogEntry != null) {
                         viewModel.selectLogEntry(null)
-                    } else if (gameState.isMapViewActive) {
-                        viewModel.toggleMapView()
                     } else if (gameState.activeRouterGame != null) {
                         viewModel.closeRouterGame()
+                    } else if (gameState.isMapViewActive) {
+                        viewModel.toggleMapView()
                     } else {
                         // Let it return to menu or exit to prevent trapping
                         viewModel.playClick()
@@ -137,7 +137,7 @@ class MainActivity : ComponentActivity() {
                                 dialogue = dialogueLines,
                                 currentIndex = currentDialogueIndex,
                                 color = currentColor,
-                                onPlayClick = { viewModel.playClick() },
+                                onTypewriterTick = { viewModel.playTypewriterTick() },
                                 onNext = { viewModel.advanceDialogue() }
                             )
                         }
@@ -154,6 +154,10 @@ class MainActivity : ComponentActivity() {
                         gameState.activeRouterGame?.let { routerGame ->
                             RouterModal(
                                 game = routerGame,
+                                locationName = gameState.locations
+                                    .firstOrNull { it.id == routerGame.locationId }
+                                    ?.name
+                                    ?: "UNKNOWN NODE",
                                 color = currentColor,
                                 onRotateTile = { x, y -> viewModel.rotateRouterTile(x, y) },
                                 onClose = { viewModel.closeRouterGame() }
