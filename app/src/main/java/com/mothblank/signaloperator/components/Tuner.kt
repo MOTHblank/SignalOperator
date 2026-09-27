@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import java.util.Locale
+import kotlin.math.abs
 import com.mothblank.signaloperator.models.KnownFrequency
 import com.mothblank.signaloperator.models.SignalKind
 
@@ -213,6 +214,24 @@ fun FrequencyTuner(
             drawPath(
                 path = needlePointer,
                 color = Color.Red
+            )
+        }
+
+        val nearestMemory = knownFrequencies
+            .minByOrNull { abs(it.frequency - frequency) }
+            ?.takeIf { abs(it.frequency - frequency) <= 0.12f }
+
+        if (nearestMemory != null) {
+            val memoryColor = when (nearestMemory.kind) {
+                SignalKind.MISSION -> color
+                SignalKind.MUNDANE_BROADCAST -> Color.Gray
+                SignalKind.DEAD_DROP -> Color.Magenta
+            }
+            Text(
+                text = "MEMORY > ${nearestMemory.label} // ${nearestMemory.kind.name.replace('_', ' ')}",
+                color = memoryColor.copy(alpha = 0.72f),
+                style = MaterialTheme.typography.labelSmall,
+                maxLines = 1
             )
         }
     }
