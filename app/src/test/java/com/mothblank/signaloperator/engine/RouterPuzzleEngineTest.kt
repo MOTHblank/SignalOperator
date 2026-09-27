@@ -49,24 +49,35 @@ class RouterPuzzleEngineTest {
 
         assertFalse(RouterPuzzleEngine.isConnected(rotated))
     }
+
     @Test
-    fun generatedPuzzleStartsUnsolvedButHasGuaranteedSolution() {
+    fun generatedPuzzleStartsUnsolvedButUsesNontrivialGuaranteedRoute() {
         val generated = RouterPuzzleEngine.create(
+            locationId = "loc",
+            seed = 814L
+        )
+        val solved = RouterPuzzleEngine.solvedTemplate(
             locationId = "loc",
             seed = 814L
         )
 
         assertFalse(RouterPuzzleEngine.isConnected(generated))
+        assertTrue(RouterPuzzleEngine.isConnected(solved))
 
-        val solvedGrid = generated.grid.map { tile ->
-            if (tile.y == generated.entryY) {
-                tile.copy(type = TilePath.STRAIGHT, rotationDegrees = 0)
-            } else {
-                tile
-            }
+        val solvedRouteContainsCorner = solved.grid.any {
+            it.type == TilePath.CORNER
         }
-
-        assertTrue(RouterPuzzleEngine.isConnected(generated.copy(grid = solvedGrid)))
+        assertTrue(solvedRouteContainsCorner)
     }
 
+    @Test
+    fun manySeedsRetainGuaranteedSolution() {
+        for (seed in 0L..100L) {
+            val generated = RouterPuzzleEngine.create("loc", seed)
+            val solved = RouterPuzzleEngine.solvedTemplate("loc", seed)
+
+            assertFalse("seed=$seed should start unsolved", RouterPuzzleEngine.isConnected(generated))
+            assertTrue("seed=$seed should have solved topology", RouterPuzzleEngine.isConnected(solved))
+        }
+    }
 }
