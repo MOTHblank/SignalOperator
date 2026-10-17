@@ -58,3 +58,7 @@ This journal is a curated repository of critical UX and accessibility learnings 
 ## 2024-10-25 - Using clearAndSetSemantics Appropriately
 **Learning:** In Jetpack Compose, use `Modifier.clearAndSetSemantics` (instead of `.semantics`) on interactive components containing decorative text/ASCII art to prevent screen readers from reading the decorative elements. However, avoid applying it to large parent containers (like overlays) as it removes all descendant semantics, rendering informative children text inaccessible.
 **Action:** Use `Modifier.clearAndSetSemantics` strategically on individual components like `SectorMapNode` to hide decorative ASCII, but avoid it on broader overlays like `DialogueOverlay` where child text is critical.
+
+## 2024-10-25 - Using minimumInteractiveComponentSize() on Custom Clickables
+**Learning:** When building custom interactive elements out of foundational Compose layout primitives like `Row` or `Box`, raw `.clickable()` modifiers do not enforce accessibility touch target minimums. This can result in tiny interactable areas that violate the 48x48dp mobile standard.
+**Action:** Apply `Modifier.minimumInteractiveComponentSize()` before `.clickable()` on custom touch targets to ensure accessibility standards are met while preserving exact visual sizing.
