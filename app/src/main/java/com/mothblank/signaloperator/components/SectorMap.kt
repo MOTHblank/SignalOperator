@@ -17,6 +17,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -192,39 +198,81 @@ fun SectorMap(
             )
         }
 
-        locations.forEach { loc ->
-            val nodeColor = nodeColor(loc.status, color)
-            val selected = loc.id == selectedLocationId
-            Box(
-                modifier = Modifier
-                    .offset(
-                        x = widthDp * loc.x - 55.dp,
-                        y = heightDp * loc.y - 22.dp
+        // Measure label contents before placing them: font scaling and narrow viewports
+        // can change their actual bounds substantially.
+        val labelWidth = minOf(110.dp, widthDp)
+        Layout(
+            modifier = Modifier.fillMaxSize(),
+            content = {
+                locations.forEach { loc ->
+                    val labelColor = nodeColor(loc.status, color)
+                    val isSelected = loc.id == selectedLocationId
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .width(labelWidth)
+                            .clickable { selectedLocationId = loc.id }
+                            .background(Color.Black.copy(alpha = if (isSelected) 0.94f else 0.78f))
+                            .border(
+                                1.dp,
+                                if (isSelected) labelColor else labelColor.copy(alpha = 0.25f)
+                            )
+                            .padding(horizontal = 4.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = loc.name,
+                            color = labelColor,
+                            style = MaterialTheme.typography.labelSmall,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = "SEC ${loc.security} / THR ${loc.threat}",
+                            color = labelColor.copy(alpha = 0.72f),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 8.sp
+                        )
+                    }
+                }
+            }
+        ) { measurables, constraints ->
+            val placeables = measurables.map {
+                it.measure(Constraints(maxWidth = constraints.maxWidth, maxHeight = constraints.maxHeight))
+            }
+            val occupied = mutableListOf<IntRect>()
+            val width = constraints.maxWidth
+            val height = constraints.maxHeight
+            // Avoid covering the network HUD and the bottom action/status panel.
+            occupied += IntRect(
+                0, 0,
+                minOf(width, 340.dp.roundToPx()),
+                minOf(height, 48.dp.roundToPx())
+            )
+            val bottomReserved = if (selectedLocation != null) 110.dp else 24.dp
+            occupied += IntRect(
+                0,
+                (height - bottomReserved.roundToPx()).coerceAtLeast(0),
+                width,
+                height
+            )
+
+            layout(width, height) {
+                placeables.forEachIndexed { index, placeable ->
+                    val location = locations[index]
+                    val position = findLabelPosition(
+                        anchorX = location.x * width,
+                        anchorY = location.y * height,
+                        labelWidth = placeable.width,
+                        labelHeight = placeable.height,
+                        viewportWidth = width,
+                        viewportHeight = height,
+                        gap = 4.dp.roundToPx(),
+                        occupied = occupied
                     )
-                    .width(110.dp)
-                    .clickable { selectedLocationId = loc.id }
-                    .background(Color.Black.copy(alpha = if (selected) 0.94f else 0.78f))
-                    .border(
-                        1.dp,
-                        if (selected) nodeColor else nodeColor.copy(alpha = 0.25f)
-                    )
-                    .padding(horizontal = 4.dp, vertical = 3.dp)
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = loc.name,
-                        color = nodeColor,
-                        style = MaterialTheme.typography.labelSmall,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = "SEC ${loc.security} / THR ${loc.threat}",
-                        color = nodeColor.copy(alpha = 0.72f),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 8.sp
+                    placeable.place(position.x, position.y)
+                    occupied += IntRect(
+                        position.x, position.y,
+                        position.x + placeable.width,
+                        position.y + placeable.height
                     )
                 }
             }
@@ -364,6 +412,60 @@ fun SectorMap(
             )
         }
     }
+}
+
+
+/**
+ * Chooses the nearest unobstructed rectangle for a label without moving its
+ * normalized network node. If a viewport is too small to fit every label,
+ * minimize the overlap rather than placing labels beyond the screen.
+ */
+private fun findLabelPosition(
+    anchorX: Float,
+    anchorY: Float,
+    labelWidth: Int,
+    labelHeight: Int,
+    viewportWidth: Int,
+    viewportHeight: Int,
+    gap: Int,
+    occupied: List<IntRect>
+): IntOffset {
+    val maxX = (viewportWidth - labelWidth).coerceAtLeast(0)
+    val maxY = (viewportHeight - labelHeight).coerceAtLeast(0)
+    val preferredX = (anchorX - labelWidth / 2f).roundToInt().coerceIn(0, maxX)
+    val preferredY = (anchorY - labelHeight / 2f).roundToInt().coerceIn(0, maxY)
+
+    val xPositions = linkedSetOf(preferredX, 0, maxX)
+    val yPositions = linkedSetOf(preferredY, 0, maxY)
+    for (x in 0..maxX step (labelWidth / 3).coerceAtLeast(1)) xPositions += x
+    for (y in 0..maxY step (labelHeight / 2).coerceAtLeast(1)) yPositions += y
+
+    var best = IntOffset(preferredX, preferredY)
+    var bestOverlap = Long.MAX_VALUE
+    var bestDistance = Long.MAX_VALUE
+
+    for (y in yPositions) {
+        for (x in xPositions) {
+            val overlap = occupied.sumOf { rect ->
+                val intersectWidth =
+                    (minOf(x + labelWidth + gap, rect.right) - maxOf(x - gap, rect.left))
+                        .coerceAtLeast(0)
+                val intersectHeight =
+                    (minOf(y + labelHeight + gap, rect.bottom) - maxOf(y - gap, rect.top))
+                        .coerceAtLeast(0)
+                intersectWidth.toLong() * intersectHeight
+            }
+            val dx = (x - preferredX).toLong()
+            val dy = (y - preferredY).toLong()
+            val distance = dx * dx + dy * dy
+            if (overlap < bestOverlap || (overlap == bestOverlap && distance < bestDistance)) {
+                best = IntOffset(x, y)
+                bestOverlap = overlap
+                bestDistance = distance
+            }
+        }
+    }
+    return best
 }
 
 private fun nodeColor(status: LocationStatus, base: Color): Color {
