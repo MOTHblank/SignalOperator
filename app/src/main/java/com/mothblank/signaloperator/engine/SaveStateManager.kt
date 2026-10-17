@@ -2,6 +2,7 @@ package com.mothblank.signaloperator.engine
 
 import android.content.Context
 import android.util.Log
+import java.io.IOException
 import com.mothblank.signaloperator.models.*
 import org.json.JSONArray
 import org.json.JSONObject
@@ -28,7 +29,7 @@ object SaveStateManager {
             .apply()
     }
 
-    fun saveGame(context: Context, state: GameState, logs: List<LogEntry>) {
+    fun saveGame(context: Context, state: GameState, logs: List<LogEntry>): Result<Unit> {
         try {
             val json = JSONObject()
             json.put("schemaVersion", CURRENT_SCHEMA_VERSION)
@@ -116,10 +117,18 @@ object SaveStateManager {
             json.put("logs", logsArray)
 
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.edit().putString(KEY_SAVE_DATA, json.toString()).apply()
-            Log.d("SaveStateManager", "Game saved successfully.")
+            // commit() reports actual persistence failures; apply() only enqueues a write.
+            if (prefs.edit().putString(KEY_SAVE_DATA, json.toString()).commit()) {
+                Log.d("SaveStateManager", "Game saved successfully.")
+                Result.success(Unit)
+            } else {
+                val failure = IOException("SharedPreferences could not persist the game save")
+                Log.e("SaveStateManager", "Error saving game", failure)
+                Result.failure(failure)
+            }
         } catch (e: Exception) {
             Log.e("SaveStateManager", "Error saving game", e)
+            Result.failure(e)
         }
     }
 
