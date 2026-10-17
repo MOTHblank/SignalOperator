@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
             val gameState by viewModel.gameState.collectAsState()
             val logs by viewModel.logs.collectAsState()
             val operatorFeedback by viewModel.operatorFeedback.collectAsState()
+            val saveError by viewModel.saveError.collectAsState()
             val bootStep by viewModel.bootStep.collectAsState()
             val signalRuntime by viewModel.signalRuntime.collectAsState()
             val activeSignal = signalRuntime.activeSignal
@@ -133,13 +134,18 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     if (gameState.isInMenu) {
-                        MenuScreen(
-                            gameState = gameState,
-                            viewModel = viewModel,
-                            onStartGame = { viewModel.startGame() },
-                            onExit = { finish() },
-                            currentColor = currentColor
-                        )
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            MenuScreen(
+                                gameState = gameState,
+                                viewModel = viewModel,
+                                onStartGame = { viewModel.startGame() },
+                                onExit = { finish() },
+                                currentColor = currentColor
+                            )
+                            saveError?.let { message ->
+                                SaveErrorDialog(message, onDismiss = { viewModel.dismissSaveError() })
+                            }
+                        }
                     } else {
                         bootStep?.let { step ->
                             BootSequenceOverlay(step = step, color = currentColor)
@@ -150,6 +156,10 @@ class MainActivity : ComponentActivity() {
                                 feedback = feedback,
                                 color = currentColor
                             )
+                        }
+
+                        saveError?.let { message ->
+                            SaveErrorDialog(message, onDismiss = { viewModel.dismissSaveError() })
                         }
 
                         activeDialogue?.let { dialogueLines ->
@@ -446,6 +456,21 @@ private fun BootSequenceOverlay(
             }
         }
     }
+}
+
+@Composable
+private fun SaveErrorDialog(message: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("SAVE FAILED", color = Color.Red) },
+        text = { Text(message, color = Color.White) },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("ACKNOWLEDGE", color = Color.Red)
+            }
+        },
+        containerColor = Color.Black
+    )
 }
 
 @Composable
