@@ -51,11 +51,13 @@ fun FrequencyTuner(
                     Spacer(modifier = Modifier.width(6.dp))
                     IconButton(
                         onClick = onShowHint,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp).semantics {
+                            contentDescription = "Open Tuning Information"
+                        }
                     ) {
                         Icon(
                             imageVector = Icons.Default.Info,
-                            contentDescription = "Open Tuning Information",
+                            contentDescription = null,
                             tint = color.copy(alpha = 0.7f),
                             modifier = Modifier.size(16.dp)
                         )
