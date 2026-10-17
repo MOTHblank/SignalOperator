@@ -82,6 +82,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _hasSavedGame = MutableStateFlow(false)
     val hasSavedGame: StateFlow<Boolean> = _hasSavedGame.asStateFlow()
 
+    private val _saveError = MutableStateFlow<String?>(null)
+    val saveError: StateFlow<String?> = _saveError.asStateFlow()
+
+    fun dismissSaveError() {
+        _saveError.value = null
+    }
+
     private val _gameState = MutableStateFlow(GameState())
     val gameState: StateFlow<GameState> = _gameState.asStateFlow()
 
@@ -485,12 +492,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun saveGame() {
-        SaveStateManager.saveGame(
+        val result = SaveStateManager.saveGame(
             getApplication(),
             _gameState.value,
             _logs.value
         )
-        _hasSavedGame.value = true
+        if (result.isSuccess) {
+            _hasSavedGame.value = true
+            _saveError.value = null
+        } else {
+            Log.e("MainViewModel", "Game progress could not be persisted", result.exceptionOrNull())
+            if (_saveError.value == null) {
+                addLog("SAVE FAILED // RECENT PROGRESS WAS NOT STORED.", LogType.ERROR)
+            }
+            _saveError.value =
+                "Recent game progress could not be saved. Check available storage and try saving again by returning to the menu."
+            showOperatorFeedback("SAVE FAILED // PROGRESS AT RISK", FeedbackTone.NEGATIVE, 4500L)
+        }
     }
 
     fun resetGame() {
