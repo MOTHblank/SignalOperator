@@ -6,9 +6,7 @@ import org.json.JSONObject
 import androidx.lifecycle.AndroidViewModel
 import android.app.Application
 import androidx.lifecycle.viewModelScope
-import com.mothblank.signaloperator.audio.AndroidTextToSpeech
-import com.mothblank.signaloperator.audio.SoundManager
-import com.mothblank.signaloperator.audio.TextToSpeechEngine
+import com.mothblank.signaloperator.audio.RadioAudioCoordinator
 import com.mothblank.signaloperator.engine.DialogueCue
 import com.mothblank.signaloperator.engine.GameSessionReducer
 import com.mothblank.signaloperator.engine.HotspotPlanner
@@ -36,10 +34,8 @@ import com.mothblank.signaloperator.engine.SystemData
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val engine = ProceduralSignalEngine()
-    private val soundManager = SoundManager(application)
-    
-    private val androidTts: TextToSpeechEngine = AndroidTextToSpeech(application, soundManager)
-    
+    private val audio = RadioAudioCoordinator(application, viewModelScope)
+
     private fun getSystemData(): SystemData {
         val batteryManager = getApplication<Application>().getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         val level = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
@@ -50,24 +46,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return SystemData(level, model, time)
     }
 
-    private fun getTts(): TextToSpeechEngine {
-        val signal = activeSignalValue
-        val tts = androidTts
-        
-        if (tts.isReady() && signal != null) {
-            val voices = tts.getAvailableVoices()
-            if (voices.isNotEmpty()) {
-                // Use signal ID to deterministically pick a voice for this specific signal
-                val seed = signal.id.hashCode().toLong()
-                val random = Random(seed)
-                val voiceName = voices[random.nextInt(voices.size)]
-                tts.setVoice(voiceName)
-            }
-        }
-        
-        return tts
-    }
-    
     private val PREFS_SETTINGS = "signal_operator_settings"
     private val KEY_CRT = "crt_enabled"
     private val KEY_SOUND = "sound_enabled"
@@ -159,7 +137,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var lockedHotspot: Float? = null
     private var activeSignalFrequency: Float? = null
     private var hardwareFailureJob: Job? = null
-    private var radioLoopJob: Job? = null
     private var bootJob: Job? = null
     private var minHotspotDistance = 100f
     private var breachMonitorJob: Job? = null
@@ -180,8 +157,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         loadSettings()
-        soundManager.setEffectsEnabled(_gameState.value.isSoundEnabled)
-        soundManager.setHapticsEnabled(_gameState.value.isHapticsEnabled)
+        audio.setEffectsEnabled(_gameState.value.isSoundEnabled)
+        audio.setHapticsEnabled(_gameState.value.isHapticsEnabled)
         when (val load = SaveStateManager.loadGame(application)) {
             is SaveStateManager.LoadOutcome.Loaded -> {
                 _hasSavedGame.value = true
@@ -216,7 +193,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (_gameState.value.isSoundEnabled) {
-            soundManager.startStatic()
+            audio.startStatic()
         }
         updateAudioParameters()
         startHardwareFailureMonitor()
@@ -330,13 +307,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleSound() {
         val newVal = !_gameState.value.isSoundEnabled
         _gameState.value = _gameState.value.copy(isSoundEnabled = newVal)
-        soundManager.setEffectsEnabled(newVal)
+        audio.setEffectsEnabled(newVal)
         saveSetting(KEY_SOUND, newVal)
         if (newVal) {
-            soundManager.startStatic()
+            audio.startStatic()
             updateAudioParameters()
         } else {
-            soundManager.stopStatic()
+            audio.stopStatic()
         }
     }
 
@@ -345,27 +322,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _gameState.value = _gameState.value.copy(isTtsEnabled = newVal)
         saveSetting(KEY_TTS, newVal)
         if (!newVal) {
-            androidTts.stop()
+            audio.stopRadioLoop()
         }
     }
 
     fun toggleHaptics() {
         val newVal = !_gameState.value.isHapticsEnabled
         _gameState.value = _gameState.value.copy(isHapticsEnabled = newVal)
-        soundManager.setHapticsEnabled(newVal)
+        audio.setHapticsEnabled(newVal)
         saveSetting(KEY_HAPTICS, newVal)
     }
 
     fun playClick() {
-        soundManager.playClick()
+        audio.playClick()
     }
 
     fun playTypewriterTick() {
-        soundManager.playTypewriterTick()
+        audio.playTypewriterTick()
     }
 
     fun playAlert() {
-        soundManager.playAlert()
+        audio.playAlert()
     }
 
     fun clearData() {
@@ -408,12 +385,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             isTtsEnabled = true,
             isHapticsEnabled = true
         )
-        soundManager.setEffectsEnabled(true)
-        soundManager.setHapticsEnabled(true)
+        audio.setEffectsEnabled(true)
+        audio.setHapticsEnabled(true)
         initializeWorld()
         generateHotspots(_gameState.value.phase, _gameState.value.seed, _gameState.value.puzzlesRequired)
 
-        soundManager.startStatic()
+        audio.startStatic()
         updateAudioParameters()
         loadHighScores()
     }
@@ -477,10 +454,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         proximityValue = 0f
 
         if (_gameState.value.isSoundEnabled) {
-            soundManager.startStatic()
+            audio.startStatic()
             updateAudioParameters()
         } else {
-            soundManager.stopStatic()
+            audio.stopStatic()
         }
 
         _logs.value = emptyList()
@@ -517,10 +494,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateProximity()
 
         if (_gameState.value.isSoundEnabled) {
-            soundManager.startStatic()
+            audio.startStatic()
             updateAudioParameters()
         } else {
-            soundManager.stopStatic()
+            audio.stopStatic()
         }
     }
 
@@ -537,7 +514,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             selectedLogEntry = null
         )
         if (!_gameState.value.isSoundEnabled) {
-            soundManager.stopStatic()
+            audio.stopStatic()
         }
         saveGame()
     }
@@ -628,7 +605,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val state = _gameState.value
         if (state.securityCharges <= 0) {
             addLog("REINFORCEMENT FAILED: NO SECURITY CHARGES AVAILABLE.", LogType.ERROR)
-            soundManager.playAlert()
+            audio.playAlert()
             return
         }
 
@@ -654,7 +631,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             containmentIntegrity = (state.containmentIntegrity + 3).coerceAtMost(100)
         )
         addLog("REINFORCED ${target.name}: +20 SECURITY / -10 THREAT.", LogType.ACTION)
-        soundManager.playCommit()
+        audio.playCommit()
         showOperatorFeedback("${target.name} REINFORCED", FeedbackTone.POSITIVE)
         saveGame()
     }
@@ -663,7 +640,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val state = _gameState.value
         if (state.securityCharges < 2) {
             addLog("RECOVERY REQUIRES 2 SECURITY CHARGES.", LogType.ERROR)
-            soundManager.playAlert()
+            audio.playAlert()
             return
         }
 
@@ -701,7 +678,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun selectLogEntry(log: LogEntry?) {
         _gameState.value = _gameState.value.copy(selectedLogEntry = log)
         if (log != null) {
-            soundManager.triggerHaptic("BUTTON_CLICK")
+            audio.triggerHaptic("BUTTON_CLICK")
         }
     }
 
@@ -755,7 +732,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (newProgress != currentProgress) {
                         _gameState.value = _gameState.value.copy(downloadProgress = newProgress)
                         if (currentProgress < 100f && newProgress >= 100f) {
-                            soundManager.playPacketComplete()
+                            audio.playPacketComplete()
                             addLog("PACKET BUFFER COMPLETE. DECODER READY.", LogType.SYSTEM)
                         }
                     }
@@ -808,7 +785,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val nextFrequency = f.coerceIn(88.0f, 108.0f)
         val notch = ((nextFrequency - 88f) * 4f).toInt()
         if (notch != lastFrequencyNotch) {
-            soundManager.playScanNotch()
+            audio.playScanNotch()
             lastFrequencyNotch = notch
         }
 
@@ -817,7 +794,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         updateProximity()
         val newProximity = proximityValue
         if (oldProximity < 0.72f && newProximity >= 0.72f && activeSignalValue == null) {
-            soundManager.playCarrierNear()
+            audio.playCarrierNear()
         }
 
         checkHotspots()
@@ -838,23 +815,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateAudioParameters() {
-        val masterVol = if (_gameState.value.isSoundEnabled) 1.0f else 0.0f
-        val baseVol = ((0.2f + proximityValue * 0.8f).coerceIn(0f, 1f)) * masterVol
-        val vol = if (activeSignalValue != null) baseVol * 0.10f else baseVol
-        val pitch = (0.8f + proximityValue * 0.4f).coerceIn(0.5f, 2.0f)
-        soundManager.updateStaticParameters(vol, pitch, stabilityValue)
-
-        if (_gameState.value.isSoundEnabled && activeSignalValue == null && minHotspotDistance < 0.6f) {
-            val proximityFactor = (1.0f - (minHotspotDistance / 0.6f)).coerceIn(0f, 1f)
-            val whistleVol = proximityFactor * 0.12f
-            val whistleFreq = (minHotspotDistance / 0.6f) * 1800f + 80f
-            soundManager.updateHeterodyne(whistleVol, whistleFreq)
-        } else {
-            soundManager.updateHeterodyne(0f, 1000f)
-        }
-
-        val droneVol = ((_gameState.value.corruptionLevel * 0.15f).coerceIn(0f, 0.35f)) * masterVol
-        soundManager.updateDroneVolume(droneVol)
+        audio.updateSignalMix(
+            soundEnabled = _gameState.value.isSoundEnabled,
+            proximity = proximityValue,
+            stability = stabilityValue,
+            hasActiveSignal = activeSignalValue != null,
+            minHotspotDistance = minHotspotDistance,
+            corruptionLevel = _gameState.value.corruptionLevel
+        )
     }
 
     fun setGain(g: Int) {
@@ -956,23 +924,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startRadioLoop(text: String, isAnomalous: Boolean) {
-        radioLoopJob?.cancel()
-        if (!_gameState.value.isTtsEnabled) return
-        radioLoopJob = viewModelScope.launch {
-            while (isActive) {
-                val tts = getTts()
-                Log.d("MainViewModel", "Radio loop using Android TTS")
-                tts.speak(text, isAnomalous)
-                // Wait for a few seconds before repeating
-                delay(8000) 
-            }
-        }
+        audio.startRadioLoop(
+            text = text,
+            isAnomalous = isAnomalous,
+            signalId = activeSignalValue?.id.orEmpty(),
+            enabled = _gameState.value.isTtsEnabled
+        )
     }
 
-    private fun stopRadioLoop() {
-        radioLoopJob?.cancel()
-        androidTts.stop()
-    }
+    private fun stopRadioLoop() = audio.stopRadioLoop()
 
     private fun checkHotspots() {
         if (isScanning) return
@@ -1039,7 +999,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     activeSignalValue = signal
                     calibrationSynced = false
                     rememberFrequency(signal)
-                    soundManager.playLockAcquired()
+                    audio.playLockAcquired()
                     addLog("LOCK ACQUIRED.", LogType.INTERCEPT)
                     
                     // Voiceover for the intercepted transmission
@@ -1101,7 +1061,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         if (!calibrationSynced && resolvedStability >= 95f) {
             calibrationSynced = true
-            soundManager.playCalibrationSync()
+            audio.playCalibrationSync()
         } else if (calibrationSynced && resolvedStability < 92f) {
             calibrationSynced = false
         }
@@ -1113,19 +1073,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         if (_gameState.value.phase == GamePhase.THE_INTERVIEW && action != "COMMIT") {
             addLog("ASSESSMENT RESPONSE REQUIRED. DISCARD CHANNEL LOCKED.", LogType.ERROR)
-            soundManager.playAlert()
+            audio.playAlert()
             return
         }
 
         if (action == "COMMIT") {
             if (_gameState.value.downloadProgress < 100f) {
                 addLog("ERROR: DECRYPTION INCOMPLETE. DOWNLOAD IN PROGRESS.", LogType.ERROR)
-                soundManager.playAlert()
+                audio.playAlert()
                 return
             }
             if (stabilityValue < 95f) {
                 addLog("ERROR: SIGNAL UNSTABLE. TRANSMISSION FAILED.", LogType.ERROR)
-                soundManager.playAlert()
+                audio.playAlert()
                 return
             }
         }
@@ -1143,12 +1103,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         if (action == "COMMIT" && !isCorrect) {
             addLog("ERROR: DATA MISMATCH. TRANSMISSION ABORTED.", LogType.ERROR)
-            soundManager.playAlert()
+            audio.playAlert()
             return
         }
 
         if (action == "COMMIT") {
-            soundManager.playCommit()
+            audio.playCommit()
             showOperatorFeedback(
                 text = when (signal.kind) {
                     SignalKind.MISSION -> "INTEL ARCHIVED"
@@ -1178,7 +1138,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 SignalKind.MUNDANE_BROADCAST -> addLog("PUBLIC BAND MISCLASSIFIED AS INTEL.", LogType.ERROR)
             }
         } else {
-            soundManager.playDiscard()
+            audio.playDiscard()
             showOperatorFeedback(
                 text = when (signal.kind) {
                     SignalKind.MISSION -> "MISSION TRAFFIC DROPPED"
@@ -1268,9 +1228,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun pauseAudio() {
         isAppInForeground = false
-        soundManager.pause()
-        androidTts.stop()
-        radioLoopJob?.cancel()
+        audio.pause()
         if (!_gameState.value.isInMenu) {
             saveGame()
         }
@@ -1278,7 +1236,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resumeAudio() {
         isAppInForeground = true
-        soundManager.resume()
+        audio.resume()
         if (isRuntimeActive()) {
             activeSignalValue?.let { startRadioLoop(it.encodedMessage, it.isAnomalous) }
         }
@@ -1296,7 +1254,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             seed = System.currentTimeMillis()
         )
         _gameState.value = _gameState.value.copy(activeRouterGame = routerState)
-        soundManager.triggerHaptic("ALARM")
+        audio.triggerHaptic("ALARM")
         startRouterCountdown()
     }
 
@@ -1329,7 +1287,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         routerCountdownJob?.cancel()
         val game = _gameState.value.activeRouterGame ?: return
         addLog("SECURITY BREACH: NODE CONTROL LOST.", LogType.ERROR)
-        soundManager.playAlert()
+        audio.playAlert()
         showOperatorFeedback("NODE LOST // SECURITY COLLAPSE", FeedbackTone.NEGATIVE, 760L)
 
         val state = _gameState.value
@@ -1372,13 +1330,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val nextState = RouterPuzzleEngine.rotate(game, x, y)
         val connectedNeighbors = RouterPuzzleEngine.connectedNeighborCount(nextState, x, y)
 
-        soundManager.playRouterTile(connectedNeighbors)
+        audio.playRouterTile(connectedNeighbors)
         _gameState.value = _gameState.value.copy(activeRouterGame = nextState)
 
         if (RouterPuzzleEngine.isConnected(nextState)) {
             routerCompleting = true
             routerCountdownJob?.cancel()
-            soundManager.playCircuitComplete()
+            audio.playCircuitComplete()
             viewModelScope.launch {
                 delay(220)
                 solveRouterGame()
@@ -1433,7 +1391,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _currentDialogueIndex.value = 0
         // Suppress continuous static hum volume if dialogue is active
         if (_gameState.value.isSoundEnabled) {
-            soundManager.updateStaticParameters(volume = 0.05f, pitch = 1.0f, stability = 0f)
+            audio.updateStaticParameters(volume = 0.05f, pitch = 1.0f, stability = 0f)
         }
     }
 
@@ -1495,7 +1453,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         routerCountdownJob?.cancel()
         breachMonitorJob?.cancel()
         hardwareFailureJob?.cancel()
-        soundManager.release()
-        androidTts.release()
+        audio.release()
     }
 }
