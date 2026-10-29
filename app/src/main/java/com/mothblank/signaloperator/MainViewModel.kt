@@ -13,6 +13,7 @@ import com.mothblank.signaloperator.engine.HotspotPlanner
 import com.mothblank.signaloperator.engine.ProceduralSignalEngine
 import com.mothblank.signaloperator.engine.RouterPuzzleEngine
 import com.mothblank.signaloperator.engine.TimedGameplayCoordinator
+import com.mothblank.signaloperator.engine.ScannerRuntimeCoordinator
 import com.mothblank.signaloperator.engine.OperatorLogRetention
 import com.mothblank.signaloperator.engine.SaveStateManager
 import com.mothblank.signaloperator.engine.SignalRequest
@@ -37,6 +38,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val engine = ProceduralSignalEngine()
     private val audio = RadioAudioCoordinator(application, viewModelScope)
     private val runtimeTimers = TimedGameplayCoordinator(viewModelScope)
+    private val scanner = ScannerRuntimeCoordinator()
 
     private fun getSystemData(): SystemData {
         val batteryManager = getApplication<Application>().getSystemService(Context.BATTERY_SERVICE) as BatteryManager
@@ -139,7 +141,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var lockedHotspot: Float? = null
     private var activeSignalFrequency: Float? = null
     private var minHotspotDistance = 100f
-    private var lastFrequencyNotch = -1
     private var calibrationSynced = false
     private var isAppInForeground = true
 
@@ -345,17 +346,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearData() {
+        val cleared = SaveStateManager.clearSave(getApplication())
+        if (cleared.isFailure) {
+            _saveError.value = "Could not safely archive and clear existing campaign data."
+            return
+        }
         val settingsPrefs = getApplication<Application>().getSharedPreferences(PREFS_SETTINGS, Context.MODE_PRIVATE)
         settingsPrefs.edit().clear().apply()
 
         val scorePrefs = getApplication<Application>().getSharedPreferences(PREFS_HIGHSCORES, Context.MODE_PRIVATE)
         scorePrefs.edit().clear().apply()
 
-        val cleared = SaveStateManager.clearSave(getApplication())
-        if (cleared.isFailure) {
-            _saveError.value = "Could not safely archive and clear existing campaign data."
-            return
-        }
         _unreadableSaveMessage.value = null
         _hasSavedGame.value = false
         runtimeTimers.stopBootSequence()
@@ -554,31 +555,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startBreachMonitor() {
         runtimeTimers.startBreachMonitor {
-        val state = _gameState.value
-        if (isRuntimeActive() &&
-            state.activeRouterGame == null &&
-            activeSignalValue == null &&
-            _activeDialogue.value == null &&
-            state.selectedLogEntry == null &&
-            (state.phase == GamePhase.ACTIVE_INVESTIGATION || state.phase == GamePhase.THE_INTERVIEW)) {
-            val breachCandidates = state.locations
-                .filter {
-                    it.status == LocationStatus.INVESTIGATING ||
-                        (it.status == LocationStatus.SECURE && it.threat >= it.security)
+            val state = _gameState.value
+            if (isRuntimeActive() &&
+                state.activeRouterGame == null &&
+                activeSignalValue == null &&
+                _activeDialogue.value == null &&
+                state.selectedLogEntry == null &&
+                (state.phase == GamePhase.ACTIVE_INVESTIGATION || state.phase == GamePhase.THE_INTERVIEW)) {
+                val breachCandidates = state.locations
+                    .filter {
+                        it.status == LocationStatus.INVESTIGATING ||
+                            (it.status == LocationStatus.SECURE && it.threat >= it.security)
+                    }
+                    .sortedByDescending { it.threat - it.security }
+
+                val targetLoc = breachCandidates.firstOrNull()
+                if (targetLoc != null) {
+                    startRouterGame(targetLoc.id)
+                    addLog(
+                        "WARNING: ${targetLoc.name} THREAT ${targetLoc.threat} / SECURITY ${targetLoc.security}. FIREWALL CHALLENGE REQUIRED.",
+                        LogType.ERROR
+                    )
+                    saveGame()
                 }
-                .sortedByDescending { it.threat - it.security }
-
-            val targetLoc = breachCandidates.firstOrNull()
-            if (targetLoc != null) {
-                startRouterGame(targetLoc.id)
-                addLog(
-                    "WARNING: ${targetLoc.name} THREAT ${targetLoc.threat} / SECURITY ${targetLoc.security}. FIREWALL CHALLENGE REQUIRED.",
-                    LogType.ERROR
-                )
-                saveGame()
             }
-        }
-
         }
     }
 
@@ -678,52 +678,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun startHardwareFailureMonitor() {
         runtimeTimers.startHardwareMonitor(::isRuntimeActive) {
-        val currentPhase = _gameState.value.phase
-        if (currentPhase == GamePhase.ACTIVE_INVESTIGATION || currentPhase == GamePhase.THE_INTERVIEW) {
-            val intensity = if (currentPhase == GamePhase.THE_INTERVIEW) 1.5f else 0.5f
-            applyHardwareDrift(intensity)
-        }
-
-        // Drift target frequency and update download progress
-        val activeSignalVal = activeSignalValue
-        val baseHotspot = lockedHotspot
-        if (activeSignalVal != null && baseHotspot != null) {
-            val targetFreq = activeSignalFrequency ?: baseHotspot
+            val currentPhase = _gameState.value.phase
             if (currentPhase == GamePhase.ACTIVE_INVESTIGATION || currentPhase == GamePhase.THE_INTERVIEW) {
-                val drift = (Random.nextFloat() - 0.5f) * 0.06f
-                val newDriftFreq = (targetFreq + drift).coerceIn(baseHotspot - 0.8f, baseHotspot + 0.8f).coerceIn(88.0f, 108.0f)
-                activeSignalFrequency = newDriftFreq
-
-                updateProximity()
-                updateStability()
-                updateAudioParameters()
+                val intensity = if (currentPhase == GamePhase.THE_INTERVIEW) 1.5f else 0.5f
+                applyHardwareDrift(intensity)
             }
 
-            val currentFreq = frequencyValue
-            val finalTargetFreq = activeSignalFrequency ?: baseHotspot
-            val distance = abs(currentFreq - finalTargetFreq)
-            val isClose = distance <= 0.2f
-            val isStable = stabilityValue >= 90f
+            // Drift target frequency and update download progress
+            val activeSignalVal = activeSignalValue
+            val baseHotspot = lockedHotspot
+            if (activeSignalVal != null && baseHotspot != null) {
+                val targetFreq = activeSignalFrequency ?: baseHotspot
+                if (currentPhase == GamePhase.ACTIVE_INVESTIGATION || currentPhase == GamePhase.THE_INTERVIEW) {
+                    val drift = (Random.nextFloat() - 0.5f) * 0.06f
+                    val newDriftFreq = (targetFreq + drift).coerceIn(baseHotspot - 0.8f, baseHotspot + 0.8f).coerceIn(88.0f, 108.0f)
+                    activeSignalFrequency = newDriftFreq
 
-            val currentProgress = _gameState.value.downloadProgress
-            val delta = when {
-                currentProgress >= 100f -> 0f
-                isClose && stabilityValue >= 95f -> {
-                    6f + ((stabilityValue - 95f) / 5f).coerceIn(0f, 1f) * 2f
+                    updateProximity()
+                    updateStability()
+                    updateAudioParameters()
                 }
-                isClose && isStable -> 1.5f
-                else -> 0f
-            }
-            val newProgress = (currentProgress + delta).coerceIn(0f, 100f)
 
-            if (newProgress != currentProgress) {
-                _gameState.value = _gameState.value.copy(downloadProgress = newProgress)
-                if (currentProgress < 100f && newProgress >= 100f) {
-                    audio.playPacketComplete()
-                    addLog("PACKET BUFFER COMPLETE. DECODER READY.", LogType.SYSTEM)
+                val currentFreq = frequencyValue
+                val finalTargetFreq = activeSignalFrequency ?: baseHotspot
+                val distance = abs(currentFreq - finalTargetFreq)
+                val isClose = distance <= 0.2f
+                val isStable = stabilityValue >= 90f
+
+                val currentProgress = _gameState.value.downloadProgress
+                val delta = when {
+                    currentProgress >= 100f -> 0f
+                    isClose && stabilityValue >= 95f -> {
+                        6f + ((stabilityValue - 95f) / 5f).coerceIn(0f, 1f) * 2f
+                    }
+                    isClose && isStable -> 1.5f
+                    else -> 0f
+                }
+                val newProgress = (currentProgress + delta).coerceIn(0f, 100f)
+
+                if (newProgress != currentProgress) {
+                    _gameState.value = _gameState.value.copy(downloadProgress = newProgress)
+                    if (currentProgress < 100f && newProgress >= 100f) {
+                        audio.playPacketComplete()
+                        addLog("PACKET BUFFER COMPLETE. DECODER READY.", LogType.SYSTEM)
+                    }
                 }
             }
-        }
         }
     }
 
@@ -767,10 +767,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setFrequency(f: Float) {
         val nextFrequency = f.coerceIn(88.0f, 108.0f)
-        val notch = ((nextFrequency - 88f) * 4f).toInt()
-        if (notch != lastFrequencyNotch) {
+        if (scanner.crossesNotch(nextFrequency)) {
             audio.playScanNotch()
-            lastFrequencyNotch = notch
         }
 
         val oldProximity = proximityValue
@@ -786,16 +784,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun updateProximity() {
-        val currentFreq = frequencyValue
-        val targetFreq = activeSignalFrequency ?: lockedHotspot
-        minHotspotDistance = if (targetFreq != null) {
-            abs(targetFreq - currentFreq)
-        } else {
-            val unsolved = hotspots.filter { it !in _gameState.value.solvedHotspots }
-            unsolved.minOfOrNull { abs(it - currentFreq) } ?: 100f
-        }
-        // Proximity is 1.0 when on hotspot, 0.0 when 2.0+ MHz away
-        proximityValue = (1.0f - (minHotspotDistance / 2.0f)).coerceIn(0f, 1.0f)
+        val reading = scanner.proximity(
+            frequency = frequencyValue,
+            activeTarget = activeSignalFrequency,
+            lockedTarget = lockedHotspot,
+            hotspots = hotspots,
+            solved = _gameState.value.solvedHotspots
+        )
+        minHotspotDistance = reading.distance
+        proximityValue = reading.strength
     }
 
     private fun updateAudioParameters() {
@@ -1010,26 +1007,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
-        // Precision calibration: total diff of 5 allowed for 95% stability
-        val gainDiff = abs(signal.targetGain - gainValue)
-        val filterDiff = abs(signal.targetFilter - filterValue)
-        
-        val totalDiff = gainDiff + filterDiff
-        // 100 - (10) = 90. We want 100 - (5) = 95.
-        var newStability = (100f - (totalDiff.toFloat())).coerceAtLeast(0f)
-        
-        if (_gameState.value.corruptionLevel > 0) {
-            val interferencePhase =
-                signal.id.hashCode() * 0.001f +
-                    gainValue * 0.071f +
-                    filterValue * 0.113f
-            val interference =
-                ((kotlin.math.sin(interferencePhase) + 1f) * 0.5f) *
-                    (_gameState.value.corruptionLevel * 5f)
-            newStability -= interference
-        }
-        
-        val resolvedStability = newStability.coerceIn(0f, 100f)
+        val resolvedStability = scanner.calibration(
+            signal = signal,
+            gain = gainValue,
+            filter = filterValue,
+            corruptionLevel = _gameState.value.corruptionLevel
+        )
         stabilityValue = resolvedStability
 
         if (!calibrationSynced && resolvedStability >= 95f) {
