@@ -60,6 +60,7 @@ fun MainMenuLayout(
     color: Color
 ) {
     val hasSavedGame by viewModel.hasSavedGame.collectAsState()
+    val unreadableSaveMessage by viewModel.unreadableSaveMessage.collectAsState()
     var showNewGameConfirm by remember { mutableStateOf(false) }
 
     if (showNewGameConfirm) {
@@ -70,7 +71,11 @@ fun MainMenuLayout(
                     onClick = {
                         viewModel.playClick()
                         showNewGameConfirm = false
-                        onStartGame()
+                        if (unreadableSaveMessage != null) {
+                            viewModel.replaceUnreadableSaveAndStart()
+                        } else {
+                            onStartGame()
+                        }
                     }
                 ) {
                     Text("START NEW RUN", color = Color.Red, fontFamily = FontFamily.Monospace)
@@ -82,10 +87,19 @@ fun MainMenuLayout(
                 }
             },
             title = {
-                Text("OVERWRITE SAVED COMMUNICATION LINK?", color = Color.Red, fontFamily = FontFamily.Monospace)
+                Text(
+                    if (unreadableSaveMessage != null) "PRESERVE AND REPLACE UNREADABLE SAVE?"
+                    else "OVERWRITE SAVED COMMUNICATION LINK?",
+                    color = Color.Red, fontFamily = FontFamily.Monospace
+                )
             },
             text = {
-                Text("Starting a new run replaces the existing campaign save.", color = color, fontFamily = FontFamily.Monospace)
+                Text(
+                    if (unreadableSaveMessage != null)
+                        "The original campaign will be archived in recovery storage before a new run starts. A newer-version save may become playable after updating the app. Cancel to preserve it untouched."
+                    else "Starting a new run replaces the existing campaign save.",
+                    color = color, fontFamily = FontFamily.Monospace
+                )
             },
             containerColor = Color.Black,
             modifier = Modifier.border(1.dp, color)
@@ -149,6 +163,20 @@ fun MainMenuLayout(
                 .padding(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (unreadableSaveMessage != null) {
+                    Text(
+                        text = "RECOVERY ALERT // ORIGINAL SAVE PROTECTED",
+                        color = Color.Red, fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = unreadableSaveMessage.orEmpty(),
+                        color = color, fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "Do not start a new run if you intend to recover this campaign.",
+                        color = color.copy(alpha = 0.8f), fontFamily = FontFamily.Monospace
+                    )
+                }
                 if (hasSavedGame) {
                     TerminalMenuItem(
                         label = "[00] CONTINUE_SAVED_LINK",
@@ -163,7 +191,7 @@ fun MainMenuLayout(
                     label = "[01] START_NEW_COMMUNICATION_LINK",
                     onClick = {
                         viewModel.playClick()
-                        if (hasSavedGame) {
+                        if (hasSavedGame || unreadableSaveMessage != null) {
                             showNewGameConfirm = true
                         } else {
                             onStartGame()

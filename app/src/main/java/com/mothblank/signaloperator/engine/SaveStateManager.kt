@@ -17,17 +17,49 @@ object SaveStateManager {
         val logs: List<LogEntry>
     )
 
+    sealed interface LoadOutcome {
+        data object NoSave : LoadOutcome
+        data class Loaded(val data: SavedData) : LoadOutcome
+        data class Corrupt(val description: String) : LoadOutcome
+        data class UnsupportedVersion(val version: Int) : LoadOutcome
+    }
+
+    private const val KEY_RECOVERY_PREFIX = "recovery_backup_"
+
+    fun hasRecoveryBackup(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .all.keys.any { it.startsWith(KEY_RECOVERY_PREFIX) }
+
     fun hasSave(context: Context): Boolean {
         return context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .contains(KEY_SAVE_DATA)
     }
 
-    fun clearSave(context: Context) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .remove(KEY_SAVE_DATA)
-            .apply()
+    /**
+     * Removes the active campaign only after a synchronous disk write. Unreadable
+     * saves are copied verbatim to a separately named recovery slot beforehand.
+     * The backup is never cleared by ordinary new-game or reset operations.
+     */
+    fun clearSave(context: Context): Result<Unit> = runCatching {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val outcome = loadGame(context)
+        val editor = prefs.edit()
+        if (outcome is LoadOutcome.Corrupt || outcome is LoadOutcome.UnsupportedVersion) {
+            val raw = prefs.all[KEY_SAVE_DATA]?.toString()
+                ?: throw IOException("Unreadable campaign could not be backed up")
+            val recoveryKey = KEY_RECOVERY_PREFIX + System.currentTimeMillis() +
+                "_" + java.util.UUID.randomUUID().toString()
+            editor.putString(recoveryKey, raw)
+        }
+        editor.remove(KEY_SAVE_DATA)
+        if (!editor.commit()) throw IOException("Failed to clear campaign; original data remains")
     }
+
+    /** Raw recovery copies are left untouched by normal gameplay and may be exported later. */
+    fun recoveryCopies(context: Context): Map<String, String> =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .all.filterKeys { it.startsWith(KEY_RECOVERY_PREFIX) }
+            .mapValues { it.value?.toString().orEmpty() }
 
     fun saveGame(context: Context, state: GameState, logs: List<LogEntry>): Result<Unit> {
         try {
@@ -132,15 +164,20 @@ object SaveStateManager {
         }
     }
 
-    fun loadGame(context: Context): SavedData? {
+    fun loadGame(context: Context): LoadOutcome {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val dataStr = prefs.getString(KEY_SAVE_DATA, null) ?: return null
+        if (!prefs.contains(KEY_SAVE_DATA)) return LoadOutcome.NoSave
         try {
+            val dataStr = prefs.getString(KEY_SAVE_DATA, null)
+                ?: return LoadOutcome.Corrupt("Save data is empty")
             val json = JSONObject(dataStr)
-            val schemaVersion = json.optInt("schemaVersion", 1)
-            if (schemaVersion !in 1..CURRENT_SCHEMA_VERSION) {
-                Log.e("SaveStateManager", "Unsupported save schema version: $schemaVersion")
-                return null
+            val schemaVersion = if (json.has("schemaVersion")) json.getInt("schemaVersion") else 1
+            if (schemaVersion > CURRENT_SCHEMA_VERSION) {
+                Log.w("SaveStateManager", "Save from newer schema version: $schemaVersion")
+                return LoadOutcome.UnsupportedVersion(schemaVersion)
+            }
+            if (schemaVersion < 1) {
+                return LoadOutcome.Corrupt("Invalid schema version: $schemaVersion")
             }
             val phase = GamePhase.valueOf(json.getString("phase"))
             val corruptionLevel = json.getDouble("corruptionLevel").toFloat()
@@ -281,10 +318,10 @@ object SaveStateManager {
                 downloadProgress = 0f
             )
 
-            return SavedData(gameState, logs)
+            return LoadOutcome.Loaded(SavedData(gameState, logs))
         } catch (e: Exception) {
-            Log.e("SaveStateManager", "Error loading game", e)
-            return null
+            Log.e("SaveStateManager", "Error loading game; original saved bytes retained", e)
+            return LoadOutcome.Corrupt("Campaign data could not be decoded")
         }
     }
 }

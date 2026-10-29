@@ -82,6 +82,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _hasSavedGame = MutableStateFlow(false)
     val hasSavedGame: StateFlow<Boolean> = _hasSavedGame.asStateFlow()
 
+    private val _unreadableSaveMessage = MutableStateFlow<String?>(null)
+    val unreadableSaveMessage: StateFlow<String?> = _unreadableSaveMessage.asStateFlow()
+
     private val _saveError = MutableStateFlow<String?>(null)
     val saveError: StateFlow<String?> = _saveError.asStateFlow()
 
@@ -175,25 +178,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         loadSettings()
         soundManager.setEffectsEnabled(_gameState.value.isSoundEnabled)
         soundManager.setHapticsEnabled(_gameState.value.isHapticsEnabled)
-        val saved = SaveStateManager.loadGame(application)
-        _hasSavedGame.value = saved != null
-
-        if (saved != null) {
-            _gameState.value = saved.gameState.copy(
-                isCrtEffectEnabled = _gameState.value.isCrtEffectEnabled,
-                isSoundEnabled = _gameState.value.isSoundEnabled,
-                isTtsEnabled = _gameState.value.isTtsEnabled,
-                isHapticsEnabled = _gameState.value.isHapticsEnabled,
-                isInMenu = true,
-                activeRouterGame = null,
-                selectedLogEntry = null,
-                downloadProgress = 0f
-            )
-            _logs.value = saved.logs
-            generateHotspots(saved.gameState.phase, saved.gameState.seed, saved.gameState.puzzlesRequired)
-        } else {
-            initializeWorld()
-            generateHotspots(_gameState.value.phase, _gameState.value.seed, _gameState.value.puzzlesRequired)
+        when (val load = SaveStateManager.loadGame(application)) {
+            is SaveStateManager.LoadOutcome.Loaded -> {
+                _hasSavedGame.value = true
+                val saved = load.data
+                _gameState.value = saved.gameState.copy(
+                    isCrtEffectEnabled = _gameState.value.isCrtEffectEnabled,
+                    isSoundEnabled = _gameState.value.isSoundEnabled,
+                    isTtsEnabled = _gameState.value.isTtsEnabled,
+                    isHapticsEnabled = _gameState.value.isHapticsEnabled,
+                    isInMenu = true,
+                    activeRouterGame = null,
+                    selectedLogEntry = null,
+                    downloadProgress = 0f
+                )
+                _logs.value = saved.logs
+                generateHotspots(saved.gameState.phase, saved.gameState.seed, saved.gameState.puzzlesRequired)
+            }
+            else -> {
+                _hasSavedGame.value = false
+                _unreadableSaveMessage.value = when (load) {
+                    is SaveStateManager.LoadOutcome.Corrupt ->
+                        "CAMPAIGN UNREADABLE // ${load.description}. The original save has NOT been overwritten."
+                    is SaveStateManager.LoadOutcome.UnsupportedVersion ->
+                        "SAVE VERSION ${load.version} IS NEWER THAN THIS APP. Update the app to resume this campaign. The save remains untouched."
+                    else -> null
+                }
+                initializeWorld()
+                generateHotspots(_gameState.value.phase, _gameState.value.seed, _gameState.value.puzzlesRequired)
+            }
         }
 
         if (_gameState.value.isSoundEnabled) {
@@ -356,7 +369,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val scorePrefs = getApplication<Application>().getSharedPreferences(PREFS_HIGHSCORES, Context.MODE_PRIVATE)
         scorePrefs.edit().clear().apply()
 
-        SaveStateManager.clearSave(getApplication())
+        val cleared = SaveStateManager.clearSave(getApplication())
+        if (cleared.isFailure) {
+            _saveError.value = "Could not safely archive and clear existing campaign data."
+            return
+        }
+        _unreadableSaveMessage.value = null
         _hasSavedGame.value = false
         bootJob?.cancel()
         bootJob = null
@@ -394,11 +412,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteSave() {
-        SaveStateManager.clearSave(getApplication())
+        val cleared = SaveStateManager.clearSave(getApplication())
+        if (cleared.isFailure) {
+            _saveError.value = "Could not safely archive and delete the saved campaign."
+            return
+        }
         _hasSavedGame.value = false
+        _unreadableSaveMessage.value = null
+    }
+
+    /** Only called after the player confirms replacing a corrupt or future-version save. */
+    fun replaceUnreadableSaveAndStart() {
+        if (_unreadableSaveMessage.value == null) {
+            startGame()
+            return
+        }
+        val cleared = SaveStateManager.clearSave(getApplication())
+        if (cleared.isFailure) {
+            _saveError.value = "Could not preserve the original campaign. No changes were made."
+            return
+        }
+        _unreadableSaveMessage.value = null
+        _hasSavedGame.value = false
+        startGame()
     }
 
     fun startGame() {
+        if (_unreadableSaveMessage.value != null) {
+            _saveError.value = "Your existing save requires explicit replacement confirmation."
+            return
+        }
         val settings = _gameState.value
         stopRadioLoop()
         routerCountdownJob?.cancel()
@@ -492,6 +535,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun saveGame() {
+        if (_unreadableSaveMessage.value != null) {
+            _saveError.value = "Unreadable campaign protected. Confirm replacement from the main menu."
+            return
+        }
         val result = SaveStateManager.saveGame(
             getApplication(),
             _gameState.value,
@@ -512,7 +559,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetGame() {
-        SaveStateManager.clearSave(getApplication())
+        val cleared = SaveStateManager.clearSave(getApplication())
+        if (cleared.isFailure) {
+            _saveError.value = "Unable to safely replace the existing campaign."
+            return
+        }
+        _unreadableSaveMessage.value = null
         _hasSavedGame.value = false
         startGame()
     }
