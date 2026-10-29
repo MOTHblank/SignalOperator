@@ -14,6 +14,7 @@ import com.mothblank.signaloperator.engine.GameSessionReducer
 import com.mothblank.signaloperator.engine.HotspotPlanner
 import com.mothblank.signaloperator.engine.ProceduralSignalEngine
 import com.mothblank.signaloperator.engine.RouterPuzzleEngine
+import com.mothblank.signaloperator.engine.OperatorLogRetention
 import com.mothblank.signaloperator.engine.SaveStateManager
 import com.mothblank.signaloperator.engine.SignalRequest
 import com.mothblank.signaloperator.models.*
@@ -137,6 +138,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
     val logs: StateFlow<List<LogEntry>> = _logs.asStateFlow()
 
+    private val _importantLogs = MutableStateFlow<List<LogEntry>>(emptyList())
+    val importantLogs: StateFlow<List<LogEntry>> = _importantLogs.asStateFlow()
+
     private val _operatorFeedback = MutableStateFlow<OperatorFeedback?>(null)
     val operatorFeedback: StateFlow<OperatorFeedback?> = _operatorFeedback.asStateFlow()
 
@@ -192,7 +196,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     selectedLogEntry = null,
                     downloadProgress = 0f
                 )
-                _logs.value = saved.logs
+                val retained = OperatorLogRetention.restore(saved.logs, saved.importantLogs)
+                _logs.value = retained.recent
+                _importantLogs.value = retained.important
                 generateHotspots(saved.gameState.phase, saved.gameState.seed, saved.gameState.puzzlesRequired)
             }
             else -> {
@@ -383,6 +389,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         routerCountdownJob?.cancel()
 
         _logs.value = emptyList()
+        _importantLogs.value = emptyList()
         activeSignalValue = null
         lockedHotspot = null
         activeSignalFrequency = null
@@ -477,6 +484,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _logs.value = emptyList()
+        _importantLogs.value = emptyList()
         addLog("SYSTEM INITIALIZED. SCANNER STANDBY.", LogType.SYSTEM)
         saveGame()
         runBootSequence {
@@ -542,7 +550,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val result = SaveStateManager.saveGame(
             getApplication(),
             _gameState.value,
-            _logs.value
+            _logs.value,
+            _importantLogs.value
         )
         if (result.isSuccess) {
             _hasSavedGame.value = true
@@ -863,7 +872,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addLog(text: String, type: LogType = LogType.SYSTEM) {
         val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
         val entry = LogEntry(UUID.randomUUID().toString(), sdf.format(Date()), text, type)
-        _logs.value = _logs.value + entry
+        val retained = OperatorLogRetention.append(
+            OperatorLogRetention.Snapshot(_logs.value, _importantLogs.value),
+            entry
+        )
+        _logs.value = retained.recent
+        _importantLogs.value = retained.important
     }
 
     private fun showOperatorFeedback(

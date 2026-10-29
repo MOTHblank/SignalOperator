@@ -14,7 +14,8 @@ object SaveStateManager {
 
     data class SavedData(
         val gameState: GameState,
-        val logs: List<LogEntry>
+        val logs: List<LogEntry>,
+        val importantLogs: List<LogEntry> = emptyList()
     )
 
     sealed interface LoadOutcome {
@@ -61,9 +62,15 @@ object SaveStateManager {
             .all.filterKeys { it.startsWith(KEY_RECOVERY_PREFIX) }
             .mapValues { it.value?.toString().orEmpty() }
 
-    fun saveGame(context: Context, state: GameState, logs: List<LogEntry>): Result<Unit> {
+    fun saveGame(
+        context: Context,
+        state: GameState,
+        logs: List<LogEntry>,
+        importantLogs: List<LogEntry> = emptyList()
+    ): Result<Unit> {
         try {
             val json = JSONObject()
+            val retainedLogs = OperatorLogRetention.restore(logs, importantLogs)
             json.put("schemaVersion", CURRENT_SCHEMA_VERSION)
             json.put("phase", state.phase.name)
             json.put("corruptionLevel", state.corruptionLevel.toDouble())
@@ -138,15 +145,14 @@ object SaveStateManager {
 
             // Logs
             val logsArray = JSONArray()
-            logs.forEach { log ->
-                val logObj = JSONObject()
-                logObj.put("id", log.id)
-                logObj.put("timestamp", log.timestamp)
-                logObj.put("text", log.text)
-                logObj.put("type", log.type.name)
-                logsArray.put(logObj)
+            retainedLogs.recent.forEach { log ->
+                logsArray.put(encodeLog(log))
             }
             json.put("logs", logsArray)
+
+            val importantArray = JSONArray()
+            retainedLogs.important.forEach { importantArray.put(encodeLog(it)) }
+            json.put("importantLogs", importantArray)
 
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             // commit() reports actual persistence failures; apply() only enqueues a write.
@@ -163,6 +169,20 @@ object SaveStateManager {
             Result.failure(e)
         }
     }
+
+    private fun encodeLog(entry: LogEntry): JSONObject = JSONObject().apply {
+        put("id", entry.id)
+        put("timestamp", entry.timestamp)
+        put("text", entry.text)
+        put("type", entry.type.name)
+    }
+
+    private fun decodeLog(json: JSONObject): LogEntry = LogEntry(
+        id = json.getString("id"),
+        timestamp = json.getString("timestamp"),
+        text = json.getString("text"),
+        type = LogType.valueOf(json.getString("type"))
+    )
 
     fun loadGame(context: Context): LoadOutcome {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -282,14 +302,16 @@ object SaveStateManager {
             val logs = mutableListOf<LogEntry>()
             val logsArray = json.getJSONArray("logs")
             for (i in 0 until logsArray.length()) {
-                val logObj = logsArray.getJSONObject(i)
-                logs.add(LogEntry(
-                    id = logObj.getString("id"),
-                    timestamp = logObj.getString("timestamp"),
-                    text = logObj.getString("text"),
-                    type = LogType.valueOf(logObj.getString("type"))
-                ))
+                logs.add(decodeLog(logsArray.getJSONObject(i)))
             }
+            val importantLogs = mutableListOf<LogEntry>()
+            val importantArray = json.optJSONArray("importantLogs")
+            if (importantArray != null) {
+                for (i in 0 until importantArray.length()) {
+                    importantLogs.add(decodeLog(importantArray.getJSONObject(i)))
+                }
+            }
+            val retainedLogs = OperatorLogRetention.restore(logs, importantLogs)
 
             val gameState = GameState(
                 phase = phase,
@@ -318,7 +340,7 @@ object SaveStateManager {
                 downloadProgress = 0f
             )
 
-            return LoadOutcome.Loaded(SavedData(gameState, logs))
+            return LoadOutcome.Loaded(SavedData(gameState, retainedLogs.recent, retainedLogs.important))
         } catch (e: Exception) {
             Log.e("SaveStateManager", "Error loading game; original saved bytes retained", e)
             return LoadOutcome.Corrupt("Campaign data could not be decoded")

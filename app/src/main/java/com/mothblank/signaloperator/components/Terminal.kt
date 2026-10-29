@@ -13,6 +13,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -27,25 +29,40 @@ import java.util.UUID
 fun Terminal(
     logs: List<LogEntry>, 
     color: Color, 
-    onLogClick: (LogEntry) -> Unit, 
-    modifier: Modifier = Modifier
+    onLogClick: (LogEntry) -> Unit,
+    modifier: Modifier = Modifier,
+    importantLogs: List<LogEntry> = emptyList()
 ) {
-    Box(modifier = modifier
-        .fillMaxWidth()
-        .border(1.dp, color)
-        .padding(8.dp)
+    var showArchive by remember { mutableStateOf(false) }
+    val visible = if (showArchive) importantLogs else logs
+    Column(
+        modifier = modifier.fillMaxWidth().border(1.dp, color).padding(8.dp)
     ) {
-        LazyColumn(reverseLayout = true) {
-            if (logs.isEmpty()) {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(
+                "RECENT [${logs.size}]",
+                modifier = Modifier.clickable { showArchive = false },
+                color = if (!showArchive) color else color.copy(alpha = 0.5f),
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                "ARCHIVE [${importantLogs.size}]",
+                modifier = Modifier.clickable { showArchive = true },
+                color = if (showArchive) color else color.copy(alpha = 0.5f),
+                fontFamily = FontFamily.Monospace
+            )
+        }
+        LazyColumn(reverseLayout = true, modifier = Modifier.weight(1f)) {
+            if (visible.isEmpty()) {
                 item {
                     Text(
-                        "[--:--:--] SESSION LOG EMPTY.",
+                        "[--:--:--] ${if (showArchive) "NO ARCHIVED INTELLIGENCE" else "SESSION LOG EMPTY"}.",
                         color = color.copy(alpha = 0.42f),
                         fontFamily = FontFamily.Monospace
                     )
                 }
             } else {
-                items(logs.reversed()) { log ->
+                items(visible.reversed(), key = { it.id }) { log ->
                     TerminalRow(log = log, color = color, onClick = { onLogClick(log) })
                 }
             }
