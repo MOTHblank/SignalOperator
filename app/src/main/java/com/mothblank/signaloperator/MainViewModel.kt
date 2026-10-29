@@ -12,6 +12,7 @@ import com.mothblank.signaloperator.engine.GameSessionReducer
 import com.mothblank.signaloperator.engine.HotspotPlanner
 import com.mothblank.signaloperator.engine.ProceduralSignalEngine
 import com.mothblank.signaloperator.engine.RouterPuzzleEngine
+import com.mothblank.signaloperator.engine.TimedGameplayCoordinator
 import com.mothblank.signaloperator.engine.OperatorLogRetention
 import com.mothblank.signaloperator.engine.SaveStateManager
 import com.mothblank.signaloperator.engine.SignalRequest
@@ -35,6 +36,7 @@ import com.mothblank.signaloperator.engine.SystemData
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val engine = ProceduralSignalEngine()
     private val audio = RadioAudioCoordinator(application, viewModelScope)
+    private val runtimeTimers = TimedGameplayCoordinator(viewModelScope)
 
     private fun getSystemData(): SystemData {
         val batteryManager = getApplication<Application>().getSystemService(Context.BATTERY_SERVICE) as BatteryManager
@@ -136,10 +138,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var isScanning = false
     private var lockedHotspot: Float? = null
     private var activeSignalFrequency: Float? = null
-    private var hardwareFailureJob: Job? = null
-    private var bootJob: Job? = null
     private var minHotspotDistance = 100f
-    private var breachMonitorJob: Job? = null
     private var lastFrequencyNotch = -1
     private var calibrationSynced = false
     private var isAppInForeground = true
@@ -359,11 +358,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         _unreadableSaveMessage.value = null
         _hasSavedGame.value = false
-        bootJob?.cancel()
-        bootJob = null
+        runtimeTimers.stopBootSequence()
         _bootStep.value = null
         stopRadioLoop()
-        routerCountdownJob?.cancel()
+        runtimeTimers.stopRouterCountdown()
 
         _logs.value = emptyList()
         _importantLogs.value = emptyList()
@@ -428,7 +426,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         val settings = _gameState.value
         stopRadioLoop()
-        routerCountdownJob?.cancel()
+        runtimeTimers.stopRouterCountdown()
 
         _gameState.value = GameState(
             phase = GamePhase.APTITUDE_TEST,
@@ -502,11 +500,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun returnToMenu() {
-        bootJob?.cancel()
-        bootJob = null
+        runtimeTimers.stopBootSequence()
         _bootStep.value = null
         stopRadioLoop()
-        routerCountdownJob?.cancel()
+        runtimeTimers.stopRouterCountdown()
         _gameState.value = _gameState.value.copy(
             isInMenu = true,
             currentMenuScreen = MenuSubScreen.MAIN,
@@ -556,35 +553,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startBreachMonitor() {
-        breachMonitorJob?.cancel()
-        breachMonitorJob = viewModelScope.launch {
-            while (true) {
-                delay(25000) // check every 25 seconds
-                val state = _gameState.value
-                if (isRuntimeActive() &&
-                    state.activeRouterGame == null &&
-                    activeSignalValue == null &&
-                    _activeDialogue.value == null &&
-                    state.selectedLogEntry == null &&
-                    (state.phase == GamePhase.ACTIVE_INVESTIGATION || state.phase == GamePhase.THE_INTERVIEW)) {
-                    val breachCandidates = state.locations
-                        .filter {
-                            it.status == LocationStatus.INVESTIGATING ||
-                                (it.status == LocationStatus.SECURE && it.threat >= it.security)
-                        }
-                        .sortedByDescending { it.threat - it.security }
-
-                    val targetLoc = breachCandidates.firstOrNull()
-                    if (targetLoc != null) {
-                        startRouterGame(targetLoc.id)
-                        addLog(
-                            "WARNING: ${targetLoc.name} THREAT ${targetLoc.threat} / SECURITY ${targetLoc.security}. FIREWALL CHALLENGE REQUIRED.",
-                            LogType.ERROR
-                        )
-                        saveGame()
-                    }
+        runtimeTimers.startBreachMonitor {
+        val state = _gameState.value
+        if (isRuntimeActive() &&
+            state.activeRouterGame == null &&
+            activeSignalValue == null &&
+            _activeDialogue.value == null &&
+            state.selectedLogEntry == null &&
+            (state.phase == GamePhase.ACTIVE_INVESTIGATION || state.phase == GamePhase.THE_INTERVIEW)) {
+            val breachCandidates = state.locations
+                .filter {
+                    it.status == LocationStatus.INVESTIGATING ||
+                        (it.status == LocationStatus.SECURE && it.threat >= it.security)
                 }
+                .sortedByDescending { it.threat - it.security }
+
+            val targetLoc = breachCandidates.firstOrNull()
+            if (targetLoc != null) {
+                startRouterGame(targetLoc.id)
+                addLog(
+                    "WARNING: ${targetLoc.name} THREAT ${targetLoc.threat} / SECURITY ${targetLoc.security}. FIREWALL CHALLENGE REQUIRED.",
+                    LogType.ERROR
+                )
+                saveGame()
             }
+        }
+
         }
     }
 
@@ -683,63 +677,53 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startHardwareFailureMonitor() {
-        hardwareFailureJob?.cancel()
-        hardwareFailureJob = viewModelScope.launch {
-            while (true) {
-                if (!isRuntimeActive()) {
-                    delay(100)
-                    continue
-                }
+        runtimeTimers.startHardwareMonitor(::isRuntimeActive) {
+        val currentPhase = _gameState.value.phase
+        if (currentPhase == GamePhase.ACTIVE_INVESTIGATION || currentPhase == GamePhase.THE_INTERVIEW) {
+            val intensity = if (currentPhase == GamePhase.THE_INTERVIEW) 1.5f else 0.5f
+            applyHardwareDrift(intensity)
+        }
 
-                val currentPhase = _gameState.value.phase
-                if (currentPhase == GamePhase.ACTIVE_INVESTIGATION || currentPhase == GamePhase.THE_INTERVIEW) {
-                    val intensity = if (currentPhase == GamePhase.THE_INTERVIEW) 1.5f else 0.5f
-                    applyHardwareDrift(intensity)
-                }
+        // Drift target frequency and update download progress
+        val activeSignalVal = activeSignalValue
+        val baseHotspot = lockedHotspot
+        if (activeSignalVal != null && baseHotspot != null) {
+            val targetFreq = activeSignalFrequency ?: baseHotspot
+            if (currentPhase == GamePhase.ACTIVE_INVESTIGATION || currentPhase == GamePhase.THE_INTERVIEW) {
+                val drift = (Random.nextFloat() - 0.5f) * 0.06f
+                val newDriftFreq = (targetFreq + drift).coerceIn(baseHotspot - 0.8f, baseHotspot + 0.8f).coerceIn(88.0f, 108.0f)
+                activeSignalFrequency = newDriftFreq
 
-                // Drift target frequency and update download progress
-                val activeSignalVal = activeSignalValue
-                val baseHotspot = lockedHotspot
-                if (activeSignalVal != null && baseHotspot != null) {
-                    val targetFreq = activeSignalFrequency ?: baseHotspot
-                    if (currentPhase == GamePhase.ACTIVE_INVESTIGATION || currentPhase == GamePhase.THE_INTERVIEW) {
-                        val drift = (Random.nextFloat() - 0.5f) * 0.06f
-                        val newDriftFreq = (targetFreq + drift).coerceIn(baseHotspot - 0.8f, baseHotspot + 0.8f).coerceIn(88.0f, 108.0f)
-                        activeSignalFrequency = newDriftFreq
-
-                        updateProximity()
-                        updateStability()
-                        updateAudioParameters()
-                    }
-
-                    val currentFreq = frequencyValue
-                    val finalTargetFreq = activeSignalFrequency ?: baseHotspot
-                    val distance = abs(currentFreq - finalTargetFreq)
-                    val isClose = distance <= 0.2f
-                    val isStable = stabilityValue >= 90f
-
-                    val currentProgress = _gameState.value.downloadProgress
-                    val delta = when {
-                        currentProgress >= 100f -> 0f
-                        isClose && stabilityValue >= 95f -> {
-                            6f + ((stabilityValue - 95f) / 5f).coerceIn(0f, 1f) * 2f
-                        }
-                        isClose && isStable -> 1.5f
-                        else -> 0f
-                    }
-                    val newProgress = (currentProgress + delta).coerceIn(0f, 100f)
-
-                    if (newProgress != currentProgress) {
-                        _gameState.value = _gameState.value.copy(downloadProgress = newProgress)
-                        if (currentProgress < 100f && newProgress >= 100f) {
-                            audio.playPacketComplete()
-                            addLog("PACKET BUFFER COMPLETE. DECODER READY.", LogType.SYSTEM)
-                        }
-                    }
-                }
-
-                delay(100)
+                updateProximity()
+                updateStability()
+                updateAudioParameters()
             }
+
+            val currentFreq = frequencyValue
+            val finalTargetFreq = activeSignalFrequency ?: baseHotspot
+            val distance = abs(currentFreq - finalTargetFreq)
+            val isClose = distance <= 0.2f
+            val isStable = stabilityValue >= 90f
+
+            val currentProgress = _gameState.value.downloadProgress
+            val delta = when {
+                currentProgress >= 100f -> 0f
+                isClose && stabilityValue >= 95f -> {
+                    6f + ((stabilityValue - 95f) / 5f).coerceIn(0f, 1f) * 2f
+                }
+                isClose && isStable -> 1.5f
+                else -> 0f
+            }
+            val newProgress = (currentProgress + delta).coerceIn(0f, 100f)
+
+            if (newProgress != currentProgress) {
+                _gameState.value = _gameState.value.copy(downloadProgress = newProgress)
+                if (currentProgress < 100f && newProgress >= 100f) {
+                    audio.playPacketComplete()
+                    addLog("PACKET BUFFER COMPLETE. DECODER READY.", LogType.SYSTEM)
+                }
+            }
+        }
         }
     }
 
@@ -868,22 +852,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun runBootSequence(onComplete: () -> Unit) {
-        bootJob?.cancel()
-        bootJob = viewModelScope.launch {
-            try {
-                for (step in 0..3) {
-                    _bootStep.value = step
-                    delay(if (step == 3) 180L else 210L)
-                }
-                _bootStep.value = null
-                if (isRuntimeActive()) {
-                    onComplete()
-                }
-            } finally {
-                _bootStep.value = null
-                bootJob = null
-            }
-        }
+        runtimeTimers.startBootSequence(
+            isRuntimeActive = ::isRuntimeActive,
+            onStep = { _bootStep.value = it },
+            onComplete = onComplete
+        )
     }
 
     private fun rememberFrequency(signal: SignalData) {
@@ -1242,7 +1215,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private var routerCountdownJob: Job? = null
     private var routerCompleting = false
 
     fun startRouterGame(locationId: String) {
@@ -1259,32 +1231,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startRouterCountdown() {
-        routerCountdownJob?.cancel()
-        routerCountdownJob = viewModelScope.launch {
-            while (isActive) {
-                if (!isRuntimeActive()) {
-                    delay(250)
-                    continue
-                }
-                delay(1000)
-                if (!isRuntimeActive()) continue
-
-                val current = _gameState.value.activeRouterGame ?: break
-                if (current.timeLeftSeconds <= 1) {
-                    failRouterGame()
-                    break
-                }
-
+        runtimeTimers.startRouterCountdown(::isRuntimeActive) {
+            val current = _gameState.value.activeRouterGame
+            if (current == null) {
+                false
+            } else if (current.timeLeftSeconds <= 1) {
+                failRouterGame()
+                false
+            } else {
                 _gameState.value = _gameState.value.copy(
                     activeRouterGame = current.copy(timeLeftSeconds = current.timeLeftSeconds - 1)
                 )
+                true
             }
         }
     }
 
     private fun failRouterGame() {
         routerCompleting = false
-        routerCountdownJob?.cancel()
+        runtimeTimers.stopRouterCountdown()
         val game = _gameState.value.activeRouterGame ?: return
         addLog("SECURITY BREACH: NODE CONTROL LOST.", LogType.ERROR)
         audio.playAlert()
@@ -1335,7 +1300,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         if (RouterPuzzleEngine.isConnected(nextState)) {
             routerCompleting = true
-            routerCountdownJob?.cancel()
+            runtimeTimers.stopRouterCountdown()
             audio.playCircuitComplete()
             viewModelScope.launch {
                 delay(220)
@@ -1346,7 +1311,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun solveRouterGame() {
         routerCompleting = false
-        routerCountdownJob?.cancel()
+        runtimeTimers.stopRouterCountdown()
         val game = _gameState.value.activeRouterGame ?: return
         addLog("FIREWALL SYNC SUCCESSFUL. NODE SECURED.", LogType.ACTION)
         showOperatorFeedback("NODE SECURED // LINK RESTORED", FeedbackTone.POSITIVE, 700L)
@@ -1450,9 +1415,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        routerCountdownJob?.cancel()
-        breachMonitorJob?.cancel()
-        hardwareFailureJob?.cancel()
+        runtimeTimers.stopRouterCountdown()
+        runtimeTimers.dispose()
         audio.release()
     }
 }
