@@ -16,7 +16,7 @@ object CarrierIdentity {
             "SYSTEM-KERNEL" -> "RF-K001"
             "HARDWARE-MONITOR" -> "RF-K002"
             "INTEL-RECOVERY" -> "RF-K003"
-            else -> "RF-" + sender.hashCode().toUInt().toString(16).takeLast(4).uppercase()
+            else -> "RF-" + Integer.toHexString(sender.hashCode()).takeLast(4).uppercase()
         }
     }
 }
