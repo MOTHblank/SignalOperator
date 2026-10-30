@@ -203,7 +203,7 @@ object SaveStateManager {
         put("message", item.message)
         put("reliability", item.reliability.name)
         put("carrierFingerprint", item.carrierFingerprint ?: JSONObject.NULL)
-        put("suspectedSpoof", item.suspectedSpoof)
+        put("suspectedDeception", item.suspectedDeception)
         put("operatorDisposition", item.operatorDisposition.name)
 
         val claimsObject = JSONObject()
@@ -247,7 +247,10 @@ object SaveStateManager {
             claims = claims,
             carrierFingerprint = if (json.isNull("carrierFingerprint")) null else json.optString("carrierFingerprint"),
             missingFields = missing,
-            suspectedSpoof = json.optBoolean("suspectedSpoof", false),
+            suspectedDeception = json.optBoolean(
+                "suspectedDeception",
+                json.optBoolean("suspectedSpoof", false)
+            ),
             operatorDisposition = runCatching {
                 EvidenceDisposition.valueOf(
                     json.optString("operatorDisposition", EvidenceDisposition.UNREVIEWED.name)
