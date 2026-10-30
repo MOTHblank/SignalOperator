@@ -4,16 +4,25 @@ import com.mothblank.signaloperator.models.SignalData
 import com.mothblank.signaloperator.models.SignalKind
 
 /**
- * Converts a processed radio signal into the information the operator actually
- * recovered, preserving uncertainty introduced by imperfect calibration.
+ * Converts a processed radio signal into only the information the operator
+ * actually recovered. Structured claims are degraded alongside visible text.
  */
 object EvidenceCapture {
     fun fromSignal(
         signal: SignalData,
         stability: Float,
-        sequence: Long
+        sequence: Long,
+        gain: Int? = null,
+        filter: Int? = null,
+        proximity: Float = 1f
     ): InterceptEvidence {
-        val recovered = InterceptRecovery.recover(signal, stability)
+        val recovered = InterceptRecovery.recover(
+            signal = signal,
+            stability = stability,
+            gain = gain,
+            filter = filter,
+            proximity = proximity
+        )
         val reliability = when (recovered.quality) {
             InterceptQuality.CLEAR -> EvidenceReliability.CLEAR
             InterceptQuality.PARTIAL -> EvidenceReliability.PARTIAL
@@ -21,16 +30,41 @@ object EvidenceCapture {
             InterceptQuality.UNUSABLE -> EvidenceReliability.UNVERIFIED
         }
 
-        val claims = buildMap {
-            putAll(signal.claims)
-            if ("authentication detail" !in recovered.missingFields) {
-                signal.outcome?.actorId?.let { put("actorId", it) }
-            } else {
-                remove("actorId")
-                remove("actorLocation")
-            }
-            put("signalKind", signal.kind.name)
+        val claims = signal.claims.toMutableMap()
+
+        if (
+            "authentication detail" in recovered.missingFields ||
+            "source identity" in recovered.missingFields
+        ) {
+            claims.remove("actorId")
         }
+
+        if ("sector reference" in recovered.missingFields) {
+            claims.remove("reportedLocation")
+            claims.remove("actorLocation")
+            claims.remove("routeRequest")
+        }
+
+        if (
+            recovered.quality == InterceptQuality.DEGRADED &&
+            claims.size > 1
+        ) {
+            val removable = claims.keys
+                .filterNot { it == "signalKind" }
+                .sorted()
+            if (removable.isNotEmpty()) {
+                val index = (signal.id.hashCode() and Int.MAX_VALUE) % removable.size
+                claims.remove(removable[index])
+            }
+        }
+
+        if (
+            "authentication detail" !in recovered.missingFields &&
+            "source identity" !in recovered.missingFields
+        ) {
+            signal.outcome?.actorId?.let { claims["actorId"] = it }
+        }
+        claims["signalKind"] = signal.kind.name
 
         val missing = recovered.missingFields.toMutableSet()
         if (signal.kind == SignalKind.MISSION && signal.outcome?.locationId == null) {
@@ -46,7 +80,7 @@ object EvidenceCapture {
             message = recovered.briefing ?: recovered.message,
             reliability = reliability,
             claims = claims,
-            carrierFingerprint = signal.carrierFingerprint.takeIf { it.isNotBlank() },
+            carrierFingerprint = recovered.carrierFingerprint,
             missingFields = missing,
             suspectedSpoof = false
         )
