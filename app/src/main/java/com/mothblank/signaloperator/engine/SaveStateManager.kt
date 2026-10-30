@@ -270,7 +270,16 @@ object SaveStateManager {
             val archivedSignals = json.getInt("archivedSignals")
             val ignoredSignals = json.getInt("ignoredSignals")
             val puzzlesSolved = json.getInt("puzzlesSolved")
-            val puzzlesRequired = json.getInt("puzzlesRequired")
+            val storedPuzzlesRequired = json.getInt("puzzlesRequired")
+            val puzzlesRequired = if (
+                schemaVersion < 7 &&
+                phase == GamePhase.ACTIVE_INVESTIGATION &&
+                storedPuzzlesRequired == 6
+            ) {
+                8
+            } else {
+                storedPuzzlesRequired
+            }
             val seed = json.getLong("seed")
             val trustInEcho = json.optInt("trustInEcho", 50)
             val exposure = json.optInt("exposure", 0)
