@@ -227,7 +227,7 @@ private fun EvidenceRow(
         it.relation == EvidenceRelation.CARRIER_MISMATCH ||
             it.relation == EvidenceRelation.CARRIER_REUSE
     }
-    val warning = contradictions > 0 || carrierWarnings > 0 || item.suspectedSpoof
+    val warning = contradictions > 0 || carrierWarnings > 0 || item.suspectedDeception
     val rowColor = if (warning) Color.Red else color
 
     Column(
@@ -255,7 +255,7 @@ private fun EvidenceRow(
         )
         if (item.suspectedSpoof) {
             Text(
-                "SOURCE STATUS > POSSIBLE SPOOF / IDENTITY CONFLICT",
+                "SOURCE STATUS > POSSIBLE DECEPTION / EVIDENCE CONFLICT",
                 color = Color.Red,
                 fontFamily = FontFamily.Monospace
             )
