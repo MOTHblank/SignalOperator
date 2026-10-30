@@ -228,6 +228,8 @@ class MainActivity : ComponentActivity() {
                                 containmentIntegrity = gameState.containmentIntegrity,
                                 exposure = gameState.exposure,
                                 trustInEcho = gameState.trustInEcho,
+                                deceptionsRejected = gameState.deceptionsRejected,
+                                deceptionsAccepted = gameState.deceptionsAccepted,
                                 color = currentColor,
                                 onRestart = { viewModel.returnToMenu() }
                             )
@@ -263,7 +265,7 @@ class MainActivity : ComponentActivity() {
                                     style = MaterialTheme.typography.labelMedium
                                 )
                                 Text(
-                                    text = "NET: ${gameState.containmentIntegrity}%  EXP: ${gameState.exposure}%  TRUST: ${gameState.trustInEcho}%  SEC: ${gameState.securityCharges}  VERIFY: ${gameState.deceptionsRejected}/${gameState.deceptionsAccepted}",
+                                    text = "NET: ${gameState.containmentIntegrity}%  EXP: ${gameState.exposure}%  TRUST: ${gameState.trustInEcho}%  SEC: ${gameState.securityCharges}",
                                     color = currentColor.copy(alpha = 0.65f),
                                     style = MaterialTheme.typography.labelSmall
                                 )
@@ -516,6 +518,8 @@ fun EndingScreen(
     containmentIntegrity: Int,
     exposure: Int,
     trustInEcho: Int,
+    deceptionsRejected: Int,
+    deceptionsAccepted: Int,
     color: Color,
     onRestart: () -> Unit,
     modifier: Modifier = Modifier
@@ -584,7 +588,7 @@ fun EndingScreen(
         }
         Spacer(modifier = Modifier.height(12.dp))
         Text(
-            text = "FINAL NETWORK // CONTAINMENT $containmentIntegrity% // EXPOSURE $exposure% // ECHO TRUST $trustInEcho%",
+            text = "FINAL NETWORK // CONTAINMENT $containmentIntegrity% // EXPOSURE $exposure% // ECHO TRUST $trustInEcho% // SPOOFS REJECTED $deceptionsRejected // DECEPTIONS ACCEPTED $deceptionsAccepted",
             color = color.copy(alpha = 0.65f),
             style = MaterialTheme.typography.labelSmall
         )
