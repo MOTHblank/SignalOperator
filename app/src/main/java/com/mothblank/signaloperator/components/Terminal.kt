@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.mothblank.signaloperator.engine.EvidenceCorrelation
+import com.mothblank.signaloperator.engine.EvidenceDisposition
 import com.mothblank.signaloperator.engine.EvidenceLink
 import com.mothblank.signaloperator.engine.EvidenceRelation
 import com.mothblank.signaloperator.engine.InterceptEvidence
@@ -38,7 +39,8 @@ fun Terminal(
     onLogClick: (LogEntry) -> Unit,
     modifier: Modifier = Modifier,
     importantLogs: List<LogEntry> = emptyList(),
-    evidence: List<InterceptEvidence> = emptyList()
+    evidence: List<InterceptEvidence> = emptyList(),
+    onEvidenceDisposition: (String, EvidenceDisposition) -> Unit = { _, _ -> }
 ) {
     var mode by remember { mutableStateOf(TerminalMode.RECENT) }
     val retainedEvidence = remember(evidence) { EvidenceCorrelation.retain(evidence) }
@@ -94,7 +96,10 @@ fun Terminal(
                         EvidenceRow(
                             item = item,
                             links = linksByEvidence[item.id].orEmpty(),
-                            color = color
+                            color = color,
+                            onDisposition = { disposition ->
+                                onEvidenceDisposition(item.id, disposition)
+                            }
                         )
                     }
                 }
@@ -142,7 +147,8 @@ private fun TerminalTab(
 private fun EvidenceRow(
     item: InterceptEvidence,
     links: List<EvidenceLink>,
-    color: Color
+    color: Color,
+    onDisposition: (EvidenceDisposition) -> Unit
 ) {
     val contradictions = links.count { it.relation == EvidenceRelation.CONTRADICTION }
     val repeatedCallsigns = links.count { it.relation == EvidenceRelation.REPEATED_CALLSIGN }
@@ -185,6 +191,51 @@ private fun EvidenceRow(
                 fontFamily = FontFamily.Monospace
             )
         }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                "OPERATOR: ${item.operatorDisposition.name}",
+                color = when (item.operatorDisposition) {
+                    EvidenceDisposition.TRUSTED -> color
+                    EvidenceDisposition.SUSPICIOUS -> Color.Red
+                    EvidenceDisposition.UNREVIEWED -> color.copy(alpha = 0.55f)
+                },
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                "[TRUST]",
+                modifier = Modifier.clickable {
+                    onDisposition(EvidenceDisposition.TRUSTED)
+                },
+                color = if (item.operatorDisposition == EvidenceDisposition.TRUSTED) {
+                    color
+                } else {
+                    color.copy(alpha = 0.45f)
+                },
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                "[FLAG]",
+                modifier = Modifier.clickable {
+                    onDisposition(EvidenceDisposition.SUSPICIOUS)
+                },
+                color = if (item.operatorDisposition == EvidenceDisposition.SUSPICIOUS) {
+                    Color.Red
+                } else {
+                    color.copy(alpha = 0.45f)
+                },
+                fontFamily = FontFamily.Monospace
+            )
+            Text(
+                "[CLEAR]",
+                modifier = Modifier.clickable {
+                    onDisposition(EvidenceDisposition.UNREVIEWED)
+                },
+                color = color.copy(alpha = 0.45f),
+                fontFamily = FontFamily.Monospace
+            )
+        }
+
         if (item.missingFields.isNotEmpty()) {
             Text(
                 "MISSING > ${item.missingFields.sorted().joinToString(", ")}",
