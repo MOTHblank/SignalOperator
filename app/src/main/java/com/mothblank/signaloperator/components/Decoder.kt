@@ -12,6 +12,8 @@ import com.mothblank.signaloperator.models.PuzzleInteraction
 import com.mothblank.signaloperator.models.SignalData
 import com.mothblank.signaloperator.models.SignalKind
 import com.mothblank.signaloperator.models.Urgency
+import com.mothblank.signaloperator.engine.InterceptQuality
+import com.mothblank.signaloperator.engine.InterceptRecovery
 import kotlinx.coroutines.delay
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -35,14 +37,20 @@ fun getDecoderHint(
             "A secure telemetry packet stream is currently being downloaded. You must maintain frequency lock (keep the LOCK LED active) and optimize signal alignment (keep GAIN and FILTER balanced) to prevent download drift or progress loss."
         )
     }
-    if (stability < 95f) {
+    if (stability < InterceptRecovery.MIN_ACTIONABLE_STABILITY) {
         return Pair(
-            "DATA DECODER: SIGNAL CORRUPTION",
-            "The data packet download has completed, but the local buffer is corrupted due to wave misalignment. Adjust the GAIN and FILTER sliders until stability is at least 95% to clear the distortion and reveal the decrypted message."
+            "DATA DECODER: PAYLOAD UNRECOVERABLE",
+            "The packet buffer is complete, but calibration is too poor to reconstruct a usable payload. Raise stability to at least ${InterceptRecovery.MIN_ACTIONABLE_STABILITY.toInt()}%."
+        )
+    }
+    if (stability < InterceptRecovery.PARTIAL_STABILITY) {
+        return Pair(
+            "DATA DECODER: DEGRADED INTERCEPT",
+            "The transmission is usable, but words, authentication details, or sector references may be missing. You may act now or improve calibration to recover more of the original signal."
         )
     }
     
-    // Now the puzzle is active and readable
+    // The puzzle is actionable; quality still determines how much information is visible.
     return when (signal.puzzleType) {
         PuzzleType.CRYPTOGRAPHY -> {
             when (signal.cipherType) {
@@ -262,10 +270,11 @@ fun Decoder(
                     )
                 }
             } else {
-                if (stability < 95f) {
+                val recovered = InterceptRecovery.recover(signal, stability)
+                if (!recovered.actionable) {
                     Text(
-                        "DATA CORRUPTED. STABILIZE SIGNAL (GAIN/FILTER) TO RECOVER (95%+).", 
-                        color = color.copy(alpha = 0.7f),
+                        "PAYLOAD UNRECOVERABLE. STABILIZE TO ${InterceptRecovery.MIN_ACTIONABLE_STABILITY.toInt()}%+.", 
+                        color = Color.Red,
                         modifier = Modifier.padding(top = 8.dp),
                         style = MaterialTheme.typography.bodyMedium
                     )
@@ -281,11 +290,28 @@ fun Decoder(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+
+                val qualityColor = when (recovered.quality) {
+                    InterceptQuality.CLEAR -> color
+                    InterceptQuality.PARTIAL -> Color.Yellow
+                    InterceptQuality.DEGRADED -> CrtRed
+                    InterceptQuality.UNUSABLE -> CrtRed
+                }
+                Text(
+                    "RECOVERY: ${recovered.quality.name}" +
+                        if (recovered.missingFields.isNotEmpty()) {
+                            " // MISSING: " + recovered.missingFields.joinToString(", ").uppercase()
+                        } else "",
+                    color = qualityColor,
+                    style = MaterialTheme.typography.labelSmall
+                )
+                Spacer(modifier = Modifier.height(6.dp))
                 
                 if (signal.puzzleType == PuzzleType.OBSERVATION && !showObservationText) {
                     Text("QUESTION: ${signal.metadata.removePrefix("TYPE: OBSERVATION | Q: ")}", color = color)
                 } else {
-                    Text("INTERCEPT: ${signal.encodedMessage}", color = color)
+                    Text("SOURCE: ${recovered.sender}", color = color.copy(alpha = 0.72f), style = MaterialTheme.typography.labelSmall)
+                    Text("INTERCEPT: ${recovered.message}", color = color)
                     if (isGlyphSequence) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text("KEY MATRIX: ${signal.metadata}", color = color.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium)
@@ -312,11 +338,11 @@ fun Decoder(
                             style = MaterialTheme.typography.labelMedium
                         )
                         Text(
-                            outcome.briefing,
+                            recovered.briefing ?: "[FIELD CONTEXT UNRECOVERED]",
                             color = color.copy(alpha = 0.82f),
                             style = MaterialTheme.typography.bodySmall
                         )
-                        outcome.locationId?.let { locationId ->
+                        recovered.sectorId?.let { locationId ->
                             val locationName = when (locationId) {
                                 "loc-1" -> "SITE ALPHA"
                                 "loc-2" -> "SECTOR 4 RELAY"
