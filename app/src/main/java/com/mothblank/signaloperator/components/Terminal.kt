@@ -31,6 +31,7 @@ import java.util.Locale
 import java.util.UUID
 
 private enum class TerminalMode { RECENT, ARCHIVE, EVIDENCE }
+private enum class EvidenceFilter { ALL, FLAGGED, TRUSTED, CONFLICTS }
 
 @Composable
 fun Terminal(
@@ -43,6 +44,7 @@ fun Terminal(
     onEvidenceDisposition: (String, EvidenceDisposition) -> Unit = { _, _ -> }
 ) {
     var mode by remember { mutableStateOf(TerminalMode.RECENT) }
+    var evidenceFilter by remember { mutableStateOf(EvidenceFilter.ALL) }
     val retainedEvidence = remember(evidence) { EvidenceCorrelation.retain(evidence) }
     val evidenceLinks = remember(retainedEvidence) {
         retainedEvidence.flatMapIndexed { index, item ->
@@ -55,6 +57,24 @@ fun Terminal(
                 getOrPut(link.earlierId) { mutableListOf() }.add(link)
                 getOrPut(link.laterId) { mutableListOf() }.add(link)
             }
+        }
+    }
+
+    val evidenceHasConflict: (InterceptEvidence) -> Boolean = { item ->
+        linksByEvidence[item.id].orEmpty().any {
+            it.relation == EvidenceRelation.CONTRADICTION ||
+                it.relation == EvidenceRelation.CARRIER_MISMATCH ||
+                it.relation == EvidenceRelation.CARRIER_REUSE
+        }
+    }
+    val filteredEvidence = retainedEvidence.filter { item ->
+        when (evidenceFilter) {
+            EvidenceFilter.ALL -> true
+            EvidenceFilter.FLAGGED ->
+                item.operatorDisposition == EvidenceDisposition.SUSPICIOUS
+            EvidenceFilter.TRUSTED ->
+                item.operatorDisposition == EvidenceDisposition.TRUSTED
+            EvidenceFilter.CONFLICTS -> evidenceHasConflict(item)
         }
     }
 
@@ -82,6 +102,32 @@ fun Terminal(
         Spacer(modifier = Modifier.height(4.dp))
 
         if (mode == TerminalMode.EVIDENCE) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                EvidenceFilterTab(
+                    text = "ALL ${retainedEvidence.size}",
+                    selected = evidenceFilter == EvidenceFilter.ALL,
+                    color = color
+                ) { evidenceFilter = EvidenceFilter.ALL }
+                EvidenceFilterTab(
+                    text = "FLAG ${retainedEvidence.count { it.operatorDisposition == EvidenceDisposition.SUSPICIOUS }}",
+                    selected = evidenceFilter == EvidenceFilter.FLAGGED,
+                    color = color
+                ) { evidenceFilter = EvidenceFilter.FLAGGED }
+                EvidenceFilterTab(
+                    text = "TRUST ${retainedEvidence.count { it.operatorDisposition == EvidenceDisposition.TRUSTED }}",
+                    selected = evidenceFilter == EvidenceFilter.TRUSTED,
+                    color = color
+                ) { evidenceFilter = EvidenceFilter.TRUSTED }
+                EvidenceFilterTab(
+                    text = "CONFLICT ${retainedEvidence.count(evidenceHasConflict)}",
+                    selected = evidenceFilter == EvidenceFilter.CONFLICTS,
+                    color = color
+                ) { evidenceFilter = EvidenceFilter.CONFLICTS }
+            }
+            Spacer(modifier = Modifier.height(3.dp))
             LazyColumn(modifier = Modifier.weight(1f)) {
                 if (retainedEvidence.isEmpty()) {
                     item {
@@ -91,8 +137,16 @@ fun Terminal(
                             fontFamily = FontFamily.Monospace
                         )
                     }
+                } else if (filteredEvidence.isEmpty()) {
+                    item {
+                        Text(
+                            "[NO EVIDENCE MATCHES CURRENT FILTER]",
+                            color = color.copy(alpha = 0.42f),
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 } else {
-                    items(retainedEvidence.asReversed(), key = { it.id }) { item ->
+                    items(filteredEvidence.asReversed(), key = { it.id }) { item ->
                         EvidenceRow(
                             item = item,
                             links = linksByEvidence[item.id].orEmpty(),
@@ -139,6 +193,21 @@ private fun TerminalTab(
         text = text,
         modifier = Modifier.clickable(onClick = onClick),
         color = if (selected) color else color.copy(alpha = 0.48f),
+        fontFamily = FontFamily.Monospace
+    )
+}
+
+@Composable
+private fun EvidenceFilterTab(
+    text: String,
+    selected: Boolean,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Text(
+        text = text,
+        modifier = Modifier.clickable(onClick = onClick),
+        color = if (selected) color else color.copy(alpha = 0.42f),
         fontFamily = FontFamily.Monospace
     )
 }
