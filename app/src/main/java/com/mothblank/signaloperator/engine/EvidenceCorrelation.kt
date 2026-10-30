@@ -4,6 +4,7 @@ import kotlin.math.abs
 
 /** Observations are not verified facts; matching metadata is not proof of identity. */
 enum class EvidenceReliability { CLEAR, PARTIAL, DEGRADED, UNVERIFIED }
+enum class EvidenceDisposition { UNREVIEWED, TRUSTED, SUSPICIOUS }
 enum class EvidenceRelation {
     REPEATED_CALLSIGN,
     SHARED_FREQUENCY,
@@ -25,7 +26,8 @@ data class InterceptEvidence(
     val claims: Map<String, String> = emptyMap(),
     val carrierFingerprint: String? = null,
     val missingFields: Set<String> = emptySet(),
-    val suspectedSpoof: Boolean = false
+    val suspectedSpoof: Boolean = false,
+    val operatorDisposition: EvidenceDisposition = EvidenceDisposition.UNREVIEWED
 )
 
 data class EvidenceLink(
