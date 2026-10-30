@@ -14,7 +14,10 @@ Signal Operator is a retro terminal-styled interactive simulator for Android, bu
     *   Vigenère shift ciphers
 *   **Procedural Audio Engine**: High-fidelity analog DSP synthesizer incorporating custom soft-tube saturation, overdrive, bandpass filtering, ring modulation, and mechanical keyboard acoustics.
 *   **Strategic Sector Network**: Decoded mission signals alter named sites and agents. Security, threat, containment, exposure, ECHO trust, firewall breaches, reinforcement resources, and corrupted network links persist through the run and affect the ending.
-*   **Consequential Signal Triage**: Mission, civilian, and kernel-telemetry signals have distinct roles. Ignoring mission traffic advances the incident but loses intelligence; dead drops provide strategic resources rather than campaign progress.
+*   **Persistent Investigation Workspace**: Completed intercepts become structured evidence with callsigns, frequencies, sectors, claims, RF carrier fingerprints, reliability, contradictions, and operator-authored trust/suspicion annotations. Earlier evidence is cross-checked against later traffic at the decision point.
+*   **Incomplete Intercept Recovery**: Radio calibration changes what intelligence is actually recovered. Gain affects source intelligibility, filter alignment affects RF identity and contextual data, tuning affects spectral/sector recovery, and low-quality payloads preserve deterministic missing words instead of simply passing or failing.
+*   **Ambiguous and Deceptive Communications**: Spoofed calls reuse legitimate identities with conflicting RF fingerprints, while compromised sources can authenticate correctly and still provide dangerous guidance. Suspicious transmissions may contain both true and false claims, and accepting or rejecting them has persistent consequences.
+*   **Consequential Signal Triage**: Mission, civilian, and kernel-telemetry signals have distinct roles. Ignoring legitimate mission traffic loses intelligence, while correctly rejecting adversarial requests protects the network; dead drops provide strategic resources rather than campaign progress.
 *   **Retro Visual Styling**: Clean, scanline-shadowed monochromatic CRT aesthetics built with Jetpack Compose Canvas and AGSL.
 
 ## Architecture & Technology Stack
