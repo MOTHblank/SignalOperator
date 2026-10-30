@@ -16,6 +16,7 @@ import com.mothblank.signaloperator.engine.InterceptQuality
 import com.mothblank.signaloperator.engine.InterceptRecovery
 import com.mothblank.signaloperator.engine.EvidenceCapture
 import com.mothblank.signaloperator.engine.EvidenceCorrelation
+import com.mothblank.signaloperator.engine.EvidenceDisposition
 import com.mothblank.signaloperator.engine.EvidenceRelation
 import com.mothblank.signaloperator.engine.InterceptEvidence
 import kotlinx.coroutines.delay
@@ -294,6 +295,14 @@ fun Decoder(
                         it.relation == EvidenceRelation.CARRIER_MISMATCH ||
                         it.relation == EvidenceRelation.CARRIER_REUSE
                 }
+                val relatedIds = previewAssessment.links.flatMap {
+                    listOf(it.earlierId, it.laterId)
+                }.toSet()
+                val operatorFlags = evidence.filter {
+                    it.id in relatedIds &&
+                        it.id != previewEvidence.id &&
+                        it.operatorDisposition == EvidenceDisposition.SUSPICIOUS
+                }
 
                 if (!recovered.actionable) {
                     Text(
@@ -315,7 +324,7 @@ fun Decoder(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                if (crossCheckWarnings.isNotEmpty()) {
+                if (crossCheckWarnings.isNotEmpty() || operatorFlags.isNotEmpty()) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -330,6 +339,13 @@ fun Decoder(
                         crossCheckWarnings.take(3).forEach { link ->
                             Text(
                                 "• ${link.relation.name.replace('_', ' ')}: ${link.detail}",
+                                color = CrtRed.copy(alpha = 0.9f),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        operatorFlags.take(2).forEach { flagged ->
+                            Text(
+                                "• OPERATOR FLAG: evidence #${flagged.sequence} marked suspicious",
                                 color = CrtRed.copy(alpha = 0.9f),
                                 style = MaterialTheme.typography.bodySmall
                             )
