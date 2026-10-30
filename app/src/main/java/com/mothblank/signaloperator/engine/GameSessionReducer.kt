@@ -39,17 +39,18 @@ object GameSessionReducer {
         when (signal.kind) {
             SignalKind.MISSION -> {
                 state = applyEffects(state, signal.outcome?.effects.orEmpty())
-                val deceptive = signal.outcome?.eventId?.startsWith("deception-") == true
+                val adversarial = signal.outcome?.risk != null &&
+                    signal.outcome.risk != TransmissionRisk.NONE
                 state = if (action == "COMMIT") {
                     applyEffects(
                         state.copy(
                             archivedSignals = state.archivedSignals + 1,
                             puzzlesSolved = state.puzzlesSolved + 1,
-                            deceptionsAccepted = state.deceptionsAccepted + if (deceptive) 1 else 0
+                            deceptionsAccepted = state.deceptionsAccepted + if (adversarial) 1 else 0
                         ),
                         signal.outcome?.commitEffects.orEmpty()
                     )
-                } else if (deceptive) {
+                } else if (adversarial) {
                     state.copy(
                         puzzlesSolved = state.puzzlesSolved + 1,
                         deceptionsRejected = state.deceptionsRejected + 1,
