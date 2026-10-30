@@ -203,6 +203,8 @@ data class GameState(
     val deadDropsRecovered: Int = 0,
     val routineBroadcastsCleared: Int = 0,
     val breachesPrevented: Int = 0,
+    val deceptionsRejected: Int = 0,
+    val deceptionsAccepted: Int = 0,
     val endingSummary: String? = null,
     val isMapViewActive: Boolean = false,
     val activeRouterGame: RouterGameState? = null,
