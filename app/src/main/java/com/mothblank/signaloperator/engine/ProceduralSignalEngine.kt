@@ -525,6 +525,18 @@ class ProceduralSignalEngine {
         }
 
         when (outcome?.eventId) {
+            "active-echo2-voiceprint" -> {
+                sender = "ECHO-2"
+                metadata = "AUTH: ECHO-2 // VERIFIED BASELINE | $metadata"
+            }
+            "active-outpost-missing" -> {
+                sender = "ECHO-ACTUAL"
+                metadata = "AUTH: ECHO-ACTUAL // VERIFIED BASELINE | $metadata"
+            }
+            "active-relay-isolation" -> {
+                sender = "SECTOR-4-RELAY"
+                metadata = "AUTH: RELAY // VERIFIED BASELINE | $metadata"
+            }
             "deception-echo2-route" -> {
                 sender = "ECHO-2"
                 isAnomalous = true
