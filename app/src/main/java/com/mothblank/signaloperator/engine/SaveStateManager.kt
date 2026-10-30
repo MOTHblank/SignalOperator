@@ -10,7 +10,7 @@ import org.json.JSONObject
 object SaveStateManager {
     private const val PREFS_NAME = "signal_operator_save_state"
     private const val KEY_SAVE_DATA = "save_data"
-    private const val CURRENT_SCHEMA_VERSION = 5
+    private const val CURRENT_SCHEMA_VERSION = 6
 
     data class SavedData(
         val gameState: GameState,
@@ -200,6 +200,7 @@ object SaveStateManager {
         put("sectorId", item.sectorId ?: JSONObject.NULL)
         put("message", item.message)
         put("reliability", item.reliability.name)
+        put("carrierFingerprint", item.carrierFingerprint ?: JSONObject.NULL)
         put("suspectedSpoof", item.suspectedSpoof)
 
         val claimsObject = JSONObject()
@@ -241,6 +242,7 @@ object SaveStateManager {
             message = json.optString("message"),
             reliability = reliability,
             claims = claims,
+            carrierFingerprint = if (json.isNull("carrierFingerprint")) null else json.optString("carrierFingerprint"),
             missingFields = missing,
             suspectedSpoof = json.optBoolean("suspectedSpoof", false)
         )
