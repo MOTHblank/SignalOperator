@@ -10,12 +10,13 @@ import org.json.JSONObject
 object SaveStateManager {
     private const val PREFS_NAME = "signal_operator_save_state"
     private const val KEY_SAVE_DATA = "save_data"
-    private const val CURRENT_SCHEMA_VERSION = 4
+    private const val CURRENT_SCHEMA_VERSION = 5
 
     data class SavedData(
         val gameState: GameState,
         val logs: List<LogEntry>,
-        val importantLogs: List<LogEntry> = emptyList()
+        val importantLogs: List<LogEntry> = emptyList(),
+        val evidence: List<InterceptEvidence> = emptyList()
     )
 
     sealed interface LoadOutcome {
@@ -66,7 +67,8 @@ object SaveStateManager {
         context: Context,
         state: GameState,
         logs: List<LogEntry>,
-        importantLogs: List<LogEntry> = emptyList()
+        importantLogs: List<LogEntry> = emptyList(),
+        evidence: List<InterceptEvidence> = emptyList()
     ): Result<Unit> {
         try {
             val json = JSONObject()
@@ -154,6 +156,12 @@ object SaveStateManager {
             retainedLogs.important.forEach { importantArray.put(encodeLog(it)) }
             json.put("importantLogs", importantArray)
 
+            val evidenceArray = JSONArray()
+            EvidenceCorrelation.retain(evidence).forEach { item ->
+                evidenceArray.put(encodeEvidence(item))
+            }
+            json.put("evidence", evidenceArray)
+
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             // commit() reports actual persistence failures; apply() only enqueues a write.
             if (prefs.edit().putString(KEY_SAVE_DATA, json.toString()).commit()) {
@@ -183,6 +191,60 @@ object SaveStateManager {
         text = json.getString("text"),
         type = LogType.valueOf(json.getString("type"))
     )
+
+    private fun encodeEvidence(item: InterceptEvidence): JSONObject = JSONObject().apply {
+        put("id", item.id)
+        put("sequence", item.sequence)
+        put("frequencyMhz", item.frequencyMhz.toDouble())
+        put("callsign", item.callsign ?: JSONObject.NULL)
+        put("sectorId", item.sectorId ?: JSONObject.NULL)
+        put("message", item.message)
+        put("reliability", item.reliability.name)
+        put("suspectedSpoof", item.suspectedSpoof)
+
+        val claimsObject = JSONObject()
+        item.claims.forEach { (key, value) -> claimsObject.put(key, value) }
+        put("claims", claimsObject)
+
+        val missingArray = JSONArray()
+        item.missingFields.sorted().forEach { missingArray.put(it) }
+        put("missingFields", missingArray)
+    }
+
+    private fun decodeEvidence(json: JSONObject): InterceptEvidence {
+        val claims = mutableMapOf<String, String>()
+        json.optJSONObject("claims")?.let { objectJson ->
+            val keys = objectJson.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                claims[key] = objectJson.optString(key)
+            }
+        }
+        val missing = mutableSetOf<String>()
+        json.optJSONArray("missingFields")?.let { array ->
+            for (i in 0 until array.length()) {
+                missing += array.optString(i)
+            }
+        }
+        val reliability = runCatching {
+            EvidenceReliability.valueOf(
+                json.optString("reliability", EvidenceReliability.UNVERIFIED.name)
+            )
+        }.getOrDefault(EvidenceReliability.UNVERIFIED)
+
+        return InterceptEvidence(
+            id = json.getString("id"),
+            sequence = json.optLong("sequence", 0L),
+            frequencyMhz = json.getDouble("frequencyMhz").toFloat(),
+            callsign = if (json.isNull("callsign")) null else json.optString("callsign"),
+            sectorId = if (json.isNull("sectorId")) null else json.optString("sectorId"),
+            message = json.optString("message"),
+            reliability = reliability,
+            claims = claims,
+            missingFields = missing,
+            suspectedSpoof = json.optBoolean("suspectedSpoof", false)
+        )
+    }
 
     fun loadGame(context: Context): LoadOutcome {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -313,6 +375,14 @@ object SaveStateManager {
             }
             val retainedLogs = OperatorLogRetention.restore(logs, importantLogs)
 
+            val evidence = mutableListOf<InterceptEvidence>()
+            json.optJSONArray("evidence")?.let { array ->
+                for (i in 0 until array.length()) {
+                    evidence += decodeEvidence(array.getJSONObject(i))
+                }
+            }
+            val retainedEvidence = EvidenceCorrelation.retain(evidence)
+
             val gameState = GameState(
                 phase = phase,
                 corruptionLevel = corruptionLevel,
@@ -340,7 +410,14 @@ object SaveStateManager {
                 downloadProgress = 0f
             )
 
-            return LoadOutcome.Loaded(SavedData(gameState, retainedLogs.recent, retainedLogs.important))
+            return LoadOutcome.Loaded(
+                SavedData(
+                    gameState = gameState,
+                    logs = retainedLogs.recent,
+                    importantLogs = retainedLogs.important,
+                    evidence = retainedEvidence
+                )
+            )
         } catch (e: Exception) {
             Log.e("SaveStateManager", "Error loading game; original saved bytes retained", e)
             return LoadOutcome.Corrupt("Campaign data could not be decoded")
