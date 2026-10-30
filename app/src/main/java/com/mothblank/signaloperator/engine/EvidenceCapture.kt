@@ -46,6 +46,7 @@ object EvidenceCapture {
             message = recovered.briefing ?: recovered.message,
             reliability = reliability,
             claims = claims,
+            carrierFingerprint = signal.carrierFingerprint.takeIf { it.isNotBlank() },
             missingFields = missing,
             suspectedSpoof = false
         )
