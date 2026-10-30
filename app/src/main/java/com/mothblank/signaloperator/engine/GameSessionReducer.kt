@@ -103,7 +103,7 @@ object GameSessionReducer {
                 GamePhase.LIVE_INTRUSION -> {
                     state = state.copy(
                         phase = GamePhase.ACTIVE_INVESTIGATION,
-                        puzzlesRequired = 6,
+                        puzzlesRequired = 8,
                         puzzlesSolved = 0,
                         solvedHotspots = emptySet(),
                         corruptionLevel = max(state.corruptionLevel, 1f)
