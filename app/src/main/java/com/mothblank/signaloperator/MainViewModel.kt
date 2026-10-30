@@ -8,6 +8,10 @@ import android.app.Application
 import androidx.lifecycle.viewModelScope
 import com.mothblank.signaloperator.audio.RadioAudioCoordinator
 import com.mothblank.signaloperator.engine.DialogueCue
+import com.mothblank.signaloperator.engine.EvidenceCapture
+import com.mothblank.signaloperator.engine.EvidenceCorrelation
+import com.mothblank.signaloperator.engine.EvidenceRelation
+import com.mothblank.signaloperator.engine.InterceptEvidence
 import com.mothblank.signaloperator.engine.GameSessionReducer
 import com.mothblank.signaloperator.engine.HotspotPlanner
 import com.mothblank.signaloperator.engine.ProceduralSignalEngine
@@ -123,6 +127,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _importantLogs = MutableStateFlow<List<LogEntry>>(emptyList())
     val importantLogs: StateFlow<List<LogEntry>> = _importantLogs.asStateFlow()
 
+    private val _evidence = MutableStateFlow<List<InterceptEvidence>>(emptyList())
+    val evidence: StateFlow<List<InterceptEvidence>> = _evidence.asStateFlow()
+
     private val _operatorFeedback = MutableStateFlow<OperatorFeedback?>(null)
     val operatorFeedback: StateFlow<OperatorFeedback?> = _operatorFeedback.asStateFlow()
 
@@ -176,6 +183,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val retained = OperatorLogRetention.restore(saved.logs, saved.importantLogs)
                 _logs.value = retained.recent
                 _importantLogs.value = retained.important
+                _evidence.value = EvidenceCorrelation.retain(saved.evidence)
                 generateHotspots(saved.gameState.phase, saved.gameState.seed, saved.gameState.puzzlesRequired)
             }
             else -> {
@@ -366,6 +374,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _logs.value = emptyList()
         _importantLogs.value = emptyList()
+        _evidence.value = emptyList()
         activeSignalValue = null
         lockedHotspot = null
         activeSignalFrequency = null
@@ -461,6 +470,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _logs.value = emptyList()
         _importantLogs.value = emptyList()
+        _evidence.value = emptyList()
         addLog("SYSTEM INITIALIZED. SCANNER STANDBY.", LogType.SYSTEM)
         saveGame()
         runBootSequence {
@@ -526,7 +536,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             getApplication(),
             _gameState.value,
             _logs.value,
-            _importantLogs.value
+            _importantLogs.value,
+            _evidence.value
         )
         if (result.isSuccess) {
             _hasSavedGame.value = true
@@ -1023,6 +1034,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun recordEvidence(signal: SignalData) {
+        if (signal.kind == SignalKind.MUNDANE_BROADCAST) return
+
+        val nextSequence = (_evidence.value.maxOfOrNull { it.sequence } ?: 0L) + 1L
+        val item = EvidenceCapture.fromSignal(
+            signal = signal,
+            stability = stabilityValue,
+            sequence = nextSequence
+        )
+        val assessment = EvidenceCorrelation.assess(_evidence.value, item)
+        _evidence.value = EvidenceCorrelation.append(_evidence.value, item)
+
+        val source = item.callsign ?: "UNKNOWN SOURCE"
+        addLog(
+            "EVIDENCE FILED: $source // ${"%.3f".format(Locale.US, item.frequencyMhz)} MHz // ${item.reliability.name}.",
+            LogType.INTERCEPT
+        )
+
+        val contradictions = assessment.links.filter {
+            it.relation == EvidenceRelation.CONTRADICTION
+        }
+        if (contradictions.isNotEmpty()) {
+            contradictions.take(3).forEach { link ->
+                addLog("CORRELATION WARNING: ${link.detail}", LogType.INTERCEPT)
+            }
+        }
+
+        assessment.warnings
+            .filterNot { warning ->
+                contradictions.isNotEmpty() && warning.startsWith("Contradictory reports")
+            }
+            .take(3)
+            .forEach { warning ->
+                addLog("EVIDENCE WARNING: $warning", LogType.INTERCEPT)
+            }
+    }
+
     fun handleAction(action: String, solutionInput: String = "") {
         val signal = activeSignalValue ?: return
         val currentHotspot = lockedHotspot ?: return
@@ -1064,6 +1112,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (action == "COMMIT") {
+            recordEvidence(signal)
             audio.playCommit()
             showOperatorFeedback(
                 text = when (signal.kind) {
