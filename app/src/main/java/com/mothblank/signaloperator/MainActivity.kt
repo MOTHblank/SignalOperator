@@ -263,7 +263,7 @@ class MainActivity : ComponentActivity() {
                                     style = MaterialTheme.typography.labelMedium
                                 )
                                 Text(
-                                    text = "NET: ${gameState.containmentIntegrity}%  EXP: ${gameState.exposure}%  TRUST: ${gameState.trustInEcho}%  SEC: ${gameState.securityCharges}",
+                                    text = "NET: ${gameState.containmentIntegrity}%  EXP: ${gameState.exposure}%  TRUST: ${gameState.trustInEcho}%  SEC: ${gameState.securityCharges}  VERIFY: ${gameState.deceptionsRejected}/${gameState.deceptionsAccepted}",
                                     color = currentColor.copy(alpha = 0.65f),
                                     style = MaterialTheme.typography.labelSmall
                                 )
