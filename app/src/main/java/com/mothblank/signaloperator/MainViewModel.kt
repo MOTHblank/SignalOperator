@@ -1172,16 +1172,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         if (action == "COMMIT") {
             audio.playCommit()
-            val deceptive = signal.outcome?.eventId?.startsWith("deception-") == true
+            val adversarial =
+                (signal.outcome?.risk ?: TransmissionRisk.NONE) != TransmissionRisk.NONE
             showOperatorFeedback(
                 text = when {
-                    deceptive -> "HIGH-RISK REQUEST EXECUTED"
+                    adversarial -> "HIGH-RISK REQUEST EXECUTED"
                     signal.kind == SignalKind.MISSION -> "INTEL ARCHIVED"
                     signal.kind == SignalKind.DEAD_DROP -> "TELEMETRY RECOVERED"
                     else -> "CARRIER CLASSIFICATION ERROR"
                 },
                 tone = when {
-                    deceptive -> FeedbackTone.SYSTEM
+                    adversarial -> FeedbackTone.SYSTEM
                     signal.kind == SignalKind.MUNDANE_BROADCAST -> FeedbackTone.NEGATIVE
                     else -> FeedbackTone.POSITIVE
                 }
@@ -1204,22 +1205,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         } else {
             audio.playDiscard()
-            val deceptive = signal.outcome?.eventId?.startsWith("deception-") == true
+            val adversarial =
+                (signal.outcome?.risk ?: TransmissionRisk.NONE) != TransmissionRisk.NONE
             showOperatorFeedback(
                 text = when {
-                    deceptive -> "UNVERIFIED REQUEST DENIED"
+                    adversarial -> "UNVERIFIED REQUEST DENIED"
                     signal.kind == SignalKind.MISSION -> "MISSION TRAFFIC DROPPED"
                     signal.kind == SignalKind.DEAD_DROP -> "TELEMETRY PURGED"
                     else -> "CIVILIAN BAND CLEARED"
                 },
                 tone = when {
-                    deceptive -> FeedbackTone.POSITIVE
+                    adversarial -> FeedbackTone.SYSTEM
                     signal.kind == SignalKind.MISSION -> FeedbackTone.NEGATIVE
                     else -> FeedbackTone.SYSTEM
                 }
             )
             when {
-                deceptive -> addLog("SUSPICIOUS REQUEST REJECTED. EVIDENCE RETAINED.", LogType.ACTION)
+                adversarial -> addLog("SUSPICIOUS REQUEST REJECTED. EVIDENCE RETAINED.", LogType.ACTION)
                 signal.kind == SignalKind.MISSION -> addLog("MISSION TRAFFIC DELIBERATELY IGNORED.", LogType.ERROR)
                 signal.kind == SignalKind.DEAD_DROP -> addLog("KERNEL TELEMETRY DISCARDED.", LogType.ACTION)
                 else -> addLog("CIVILIAN CARRIER CLEARED.", LogType.ACTION)
@@ -1240,20 +1242,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             signal.outcome?.briefing?.let {
                 addLog("FIELD EFFECT: $it", LogType.INTERCEPT)
             }
-            if (signal.outcome?.eventId?.startsWith("deception-") == true) {
-                addLog(
-                    "POST-ACTION AUTH FAILURE: CLAIMED SOURCE SIGNATURE REJECTED AFTER EXECUTION.",
-                    LogType.ERROR
-                )
-                showOperatorFeedback(
-                    "DECEPTION CONFIRMED // CONSEQUENCE ALREADY APPLIED",
-                    FeedbackTone.NEGATIVE,
-                    1800L
-                )
+            when (signal.outcome?.risk ?: TransmissionRisk.NONE) {
+                TransmissionRisk.SPOOF -> {
+                    addLog(
+                        "POST-ACTION AUTH FAILURE: CLAIMED SOURCE SIGNATURE REJECTED AFTER EXECUTION.",
+                        LogType.ERROR
+                    )
+                    showOperatorFeedback(
+                        "SPOOF CONFIRMED // CONSEQUENCE ALREADY APPLIED",
+                        FeedbackTone.NEGATIVE,
+                        1800L
+                    )
+                }
+                TransmissionRisk.COMPROMISED_SOURCE -> {
+                    addLog(
+                        "POST-ACTION REVIEW: SOURCE SIGNATURE VALID. OPERATIONAL GUIDANCE CONTRADICTED VERIFIED FIELD TELEMETRY.",
+                        LogType.ERROR
+                    )
+                    showOperatorFeedback(
+                        "SOURCE COMPROMISE CONFIRMED // CONSEQUENCE APPLIED",
+                        FeedbackTone.NEGATIVE,
+                        1800L
+                    )
+                }
+                TransmissionRisk.NONE -> Unit
             }
-        } else if (signal.outcome?.eventId?.startsWith("deception-") == true) {
+        } else if ((signal.outcome?.risk ?: TransmissionRisk.NONE) != TransmissionRisk.NONE) {
             addLog(
-                "UNVERIFIED HIGH-RISK REQUEST DENIED PENDING INDEPENDENT AUTHENTICATION.",
+                "UNVERIFIED HIGH-RISK REQUEST DENIED PENDING INDEPENDENT REVIEW.",
                 LogType.ACTION
             )
         }
