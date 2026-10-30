@@ -172,6 +172,8 @@ fun Decoder(
     signal: SignalData?,
     stability: Float,
     proximity: Float,
+    gain: Int,
+    filter: Int,
     downloadProgress: Float,
     color: Color,
     evidence: List<InterceptEvidence> = emptyList(),
@@ -276,12 +278,21 @@ fun Decoder(
                     )
                 }
             } else {
-                val recovered = InterceptRecovery.recover(signal, stability)
-                val previewEvidence = remember(signal.id, stability, evidence) {
+                val recovered = InterceptRecovery.recover(
+                    signal = signal,
+                    stability = stability,
+                    gain = gain,
+                    filter = filter,
+                    proximity = proximity
+                )
+                val previewEvidence = remember(signal.id, stability, gain, filter, proximity, evidence) {
                     EvidenceCapture.fromSignal(
                         signal = signal,
                         stability = stability,
-                        sequence = 0L
+                        sequence = 0L,
+                        gain = gain,
+                        filter = filter,
+                        proximity = proximity
                     )
                 }
                 val previewAssessment = remember(signal.id, stability, evidence) {
