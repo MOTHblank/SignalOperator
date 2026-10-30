@@ -253,7 +253,7 @@ private fun EvidenceRow(
             color = rowColor.copy(alpha = 0.72f),
             fontFamily = FontFamily.Monospace
         )
-        if (item.suspectedSpoof) {
+        if (item.suspectedDeception) {
             Text(
                 "SOURCE STATUS > POSSIBLE DECEPTION / EVIDENCE CONFLICT",
                 color = Color.Red,
