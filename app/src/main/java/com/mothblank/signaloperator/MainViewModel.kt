@@ -12,6 +12,7 @@ import com.mothblank.signaloperator.engine.EvidenceCapture
 import com.mothblank.signaloperator.engine.EvidenceCorrelation
 import com.mothblank.signaloperator.engine.EvidenceRelation
 import com.mothblank.signaloperator.engine.InterceptEvidence
+import com.mothblank.signaloperator.engine.InterceptRecovery
 import com.mothblank.signaloperator.engine.GameSessionReducer
 import com.mothblank.signaloperator.engine.HotspotPlanner
 import com.mothblank.signaloperator.engine.ProceduralSignalEngine
@@ -714,7 +715,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val finalTargetFreq = activeSignalFrequency ?: baseHotspot
                 val distance = abs(currentFreq - finalTargetFreq)
                 val isClose = distance <= 0.2f
-                val isStable = stabilityValue >= 90f
+                val isRecoverable = stabilityValue >= 85f
 
                 val currentProgress = _gameState.value.downloadProgress
                 val delta = when {
@@ -722,7 +723,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isClose && stabilityValue >= 95f -> {
                         6f + ((stabilityValue - 95f) / 5f).coerceIn(0f, 1f) * 2f
                     }
-                    isClose && isStable -> 1.5f
+                    isClose && stabilityValue >= InterceptRecovery.MIN_ACTIONABLE_STABILITY -> 2.2f
+                    isClose && isRecoverable -> 0.8f
                     else -> 0f
                 }
                 val newProgress = (currentProgress + delta).coerceIn(0f, 100f)
@@ -1026,10 +1028,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         stabilityValue = resolvedStability
 
-        if (!calibrationSynced && resolvedStability >= 95f) {
+        if (!calibrationSynced && resolvedStability >= InterceptRecovery.CLEAR_STABILITY) {
             calibrationSynced = true
             audio.playCalibrationSync()
-        } else if (calibrationSynced && resolvedStability < 92f) {
+        } else if (calibrationSynced && resolvedStability < InterceptRecovery.PARTIAL_STABILITY) {
             calibrationSynced = false
         }
     }
@@ -1087,8 +1089,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 audio.playAlert()
                 return
             }
-            if (stabilityValue < 95f) {
-                addLog("ERROR: SIGNAL UNSTABLE. TRANSMISSION FAILED.", LogType.ERROR)
+            if (stabilityValue < InterceptRecovery.MIN_ACTIONABLE_STABILITY) {
+                addLog(
+                    "ERROR: PAYLOAD UNRECOVERABLE BELOW ${InterceptRecovery.MIN_ACTIONABLE_STABILITY.toInt()}% STABILITY.",
+                    LogType.ERROR
+                )
                 audio.playAlert()
                 return
             }
