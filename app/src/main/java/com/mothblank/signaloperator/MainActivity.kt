@@ -365,6 +365,8 @@ class MainActivity : ComponentActivity() {
                                         signal           = activeSignal,
                                         stability        = stability,
                                         proximity        = proximity,
+                                        gain             = gain,
+                                        filter           = filter,
                                         downloadProgress = gameState.downloadProgress,
                                         color            = currentColor,
                                         evidence         = evidence,
