@@ -1071,7 +1071,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             EvidenceRelation.CARRIER_REUSE
         )
         val item = rawItem.copy(
-            suspectedSpoof = assessment.links.any { it.relation in suspiciousRelations },
+            suspectedDeception = assessment.links.any { it.relation in suspiciousRelations },
             operatorDisposition = previous?.operatorDisposition ?: EvidenceDisposition.UNREVIEWED
         )
         _evidence.value = EvidenceCorrelation.append(_evidence.value, item)
@@ -1080,7 +1080,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val qualityImproved = previous != null &&
             item.reliability.ordinal < previous.reliability.ordinal
         val suspicionChanged = previous != null &&
-            previous.suspectedSpoof != item.suspectedSpoof
+            previous.suspectedDeception != item.suspectedDeception
 
         if (isNew || qualityImproved) {
             val source = item.callsign ?: "UNKNOWN SOURCE"
