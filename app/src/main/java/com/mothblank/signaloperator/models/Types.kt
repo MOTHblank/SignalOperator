@@ -75,6 +75,7 @@ data class SignalOutcome(
     val locationId: String? = null,
     val actorId: String? = null,
     val intelValue: Int = 1,
+    val claims: Map<String, String> = emptyMap(),
     val effects: List<WorldEffect> = emptyList(),
     val commitEffects: List<WorldEffect> = emptyList()
 )
@@ -95,7 +96,8 @@ data class SignalData(
     val kind: SignalKind = SignalKind.MISSION,
     val interaction: PuzzleInteraction = PuzzleInteraction.TEXT_ENTRY,
     val outcome: SignalOutcome? = null,
-    val claims: Map<String, String> = emptyMap()
+    val claims: Map<String, String> = emptyMap(),
+    val carrierFingerprint: String = ""
 )
 
 data class KnownFrequency(
