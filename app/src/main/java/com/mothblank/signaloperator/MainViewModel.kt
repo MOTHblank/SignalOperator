@@ -1040,12 +1040,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (signal.kind == SignalKind.MUNDANE_BROADCAST) return
 
         val nextSequence = (_evidence.value.maxOfOrNull { it.sequence } ?: 0L) + 1L
-        val item = EvidenceCapture.fromSignal(
+        val rawItem = EvidenceCapture.fromSignal(
             signal = signal,
             stability = stabilityValue,
             sequence = nextSequence
         )
-        val assessment = EvidenceCorrelation.assess(_evidence.value, item)
+        val assessment = EvidenceCorrelation.assess(_evidence.value, rawItem)
+        val item = rawItem.copy(
+            suspectedSpoof = assessment.links.any {
+                it.relation == EvidenceRelation.CONTRADICTION
+            }
+        )
         _evidence.value = EvidenceCorrelation.append(_evidence.value, item)
 
         val source = item.callsign ?: "UNKNOWN SOURCE"
@@ -1182,6 +1187,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             signal.outcome?.briefing?.let {
                 addLog("FIELD EFFECT: $it", LogType.INTERCEPT)
             }
+            if (signal.outcome?.eventId == "active-echo2-spoof") {
+                addLog(
+                    "POST-ACTION AUTH FAILURE: ECHO-2 SIGNATURE REJECTED AFTER ROUTE EXECUTION.",
+                    LogType.ERROR
+                )
+                showOperatorFeedback(
+                    "SPOOF CONFIRMED // ROUTE ALREADY OPEN",
+                    FeedbackTone.NEGATIVE,
+                    1800L
+                )
+            }
+        } else if (signal.outcome?.eventId == "active-echo2-spoof") {
+            addLog(
+                "UNVERIFIED ECHO-2 EMERGENCY ROUTE DENIED.",
+                LogType.ACTION
+            )
         }
 
         when (resolution.dialogueCue) {
