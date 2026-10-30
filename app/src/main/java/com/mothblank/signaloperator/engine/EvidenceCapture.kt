@@ -22,8 +22,12 @@ object EvidenceCapture {
         }
 
         val claims = buildMap {
+            putAll(signal.claims)
             if ("authentication detail" !in recovered.missingFields) {
                 signal.outcome?.actorId?.let { put("actorId", it) }
+            } else {
+                remove("actorId")
+                remove("actorLocation")
             }
             put("signalKind", signal.kind.name)
         }
