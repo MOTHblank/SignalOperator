@@ -365,6 +365,7 @@ class MainActivity : ComponentActivity() {
                                         proximity        = proximity,
                                         downloadProgress = gameState.downloadProgress,
                                         color            = currentColor,
+                                        evidence         = evidence,
                                         onAction         = { action, input -> viewModel.handleAction(action, input) },
                                         onShowHint       = { title, desc -> activeHint = Pair(title, desc) }
                                     )
