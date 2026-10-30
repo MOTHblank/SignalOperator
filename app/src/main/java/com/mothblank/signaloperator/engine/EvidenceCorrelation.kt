@@ -26,7 +26,7 @@ data class InterceptEvidence(
     val claims: Map<String, String> = emptyMap(),
     val carrierFingerprint: String? = null,
     val missingFields: Set<String> = emptySet(),
-    val suspectedSpoof: Boolean = false,
+    val suspectedDeception: Boolean = false,
     val operatorDisposition: EvidenceDisposition = EvidenceDisposition.UNREVIEWED
 )
 
