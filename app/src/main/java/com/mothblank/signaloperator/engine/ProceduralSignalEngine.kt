@@ -524,23 +524,34 @@ class ProceduralSignalEngine {
             SignalKind.MUNDANE_BROADCAST -> null
         }
 
-        if (outcome?.eventId == "active-echo2-spoof") {
-            sender = "ECHO-2"
-            isAnomalous = true
-            metadata = "AUTH: ECHO-2 // PRIORITY OVERRIDE | $metadata"
+        when (outcome?.eventId) {
+            "deception-echo2-route" -> {
+                sender = "ECHO-2"
+                isAnomalous = true
+                metadata = "AUTH: ECHO-2 // PRIORITY OVERRIDE | $metadata"
+            }
+            "deception-relay-clearance" -> {
+                sender = "SECTOR-4-RELAY"
+                isAnomalous = true
+                metadata = "AUTH: RELAY // MAINTENANCE OVERRIDE | $metadata"
+            }
+            "deception-echoactual-evac" -> {
+                sender = "ECHO-ACTUAL"
+                isAnomalous = true
+                metadata = "AUTH: ECHO-ACTUAL // EVAC PRIORITY | $metadata"
+            }
         }
 
         val claims = buildMap {
-            outcome?.actorId?.let { put("actorId", it) }
-            outcome?.locationId?.let { put("reportedLocation", it) }
+            putAll(outcome?.claims.orEmpty())
+            outcome?.actorId?.let { putIfAbsent("actorId", it) }
+            outcome?.locationId?.let { putIfAbsent("reportedLocation", it) }
             if (outcome?.actorId != null && outcome.locationId != null) {
-                put("actorLocation", outcome.locationId)
-            }
-            if (outcome?.eventId == "active-echo2-spoof") {
-                put("routeRequest", "EXCLUSION_ZONE")
-                put("relayStatus", "COMPROMISED")
+                putIfAbsent("actorLocation", outcome.locationId)
             }
         }
+
+        val carrierFingerprint = CarrierIdentity.fingerprint(sender, outcome?.eventId)
 
         return SignalData(
             id = id,
@@ -558,7 +569,8 @@ class ProceduralSignalEngine {
             kind = signalKind,
             interaction = interaction,
             outcome = outcome,
-            claims = claims
+            claims = claims,
+            carrierFingerprint = carrierFingerprint
         )
     }
 
@@ -680,7 +692,7 @@ class ProceduralSignalEngine {
                 )
             }
 
-            GamePhase.ACTIVE_INVESTIGATION -> when (solvedPuzzlesCount % 6) {
+            GamePhase.ACTIVE_INVESTIGATION -> when (solvedPuzzlesCount % 8) {
                 0 -> SignalOutcome(
                     eventId = "active-echo2-voiceprint",
                     briefing = "Voiceprint drift suggests ECHO-2 may no longer be the sole source of ECHO-2 transmissions.",
@@ -688,6 +700,10 @@ class ProceduralSignalEngine {
                     locationId = "loc-2",
                     actorId = "char-2",
                     intelValue = 3,
+                    claims = mapOf(
+                        "actorLocation" to "loc-2",
+                        "voiceprintStatus" to "DRIFTING"
+                    ),
                     effects = listOf(
                         WorldEffect(WorldEffectType.SET_CHARACTER_COMPROMISED, targetId = "char-2"),
                         WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-2", amount = 35),
@@ -702,6 +718,10 @@ class ProceduralSignalEngine {
                     urgency = Urgency.HIGH,
                     locationId = "loc-1",
                     intelValue = 3,
+                    claims = mapOf(
+                        "anchorStatus" to "ACTIVE",
+                        "containmentAdvice" to "SECURE_SITE_ALPHA"
+                    ),
                     commitEffects = listOf(
                         WorldEffect(WorldEffectType.ADD_LOCATION_SECURITY, targetId = "loc-1", amount = 15),
                         WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = 8)
@@ -715,6 +735,10 @@ class ProceduralSignalEngine {
                     locationId = "loc-3",
                     actorId = "char-1",
                     intelValue = 3,
+                    claims = mapOf(
+                        "actorLocation" to "loc-3",
+                        "fieldTeamStatus" to "MISSING"
+                    ),
                     effects = listOf(
                         WorldEffect(WorldEffectType.SET_CHARACTER_MIA, targetId = "char-1"),
                         WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-3", amount = 45),
@@ -724,12 +748,17 @@ class ProceduralSignalEngine {
                 )
 
                 3 -> SignalOutcome(
-                    eventId = "active-echo2-spoof",
+                    eventId = "deception-echo2-route",
                     briefing = "ECHO-2 requests emergency routing through the EXCLUSION ZONE and claims the SECTOR 4 channel is compromised.",
                     urgency = Urgency.CRITICAL,
                     locationId = "loc-4",
                     actorId = "char-2",
                     intelValue = 4,
+                    claims = mapOf(
+                        "actorLocation" to "loc-4",
+                        "routeRequest" to "EXCLUSION_ZONE",
+                        "relayStatus" to "COMPROMISED"
+                    ),
                     commitEffects = listOf(
                         WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-4", amount = 35),
                         WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-4"),
@@ -745,23 +774,66 @@ class ProceduralSignalEngine {
                     urgency = Urgency.CRITICAL,
                     actorId = "char-3",
                     intelValue = 4,
+                    claims = mapOf(
+                        "subjectLocation" to "OPERATOR_TERMINAL",
+                        "subjectInExclusionZone" to "FALSE"
+                    ),
                     effects = listOf(
                         WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 18),
                         WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = -12)
                     )
                 )
 
-                else -> SignalOutcome(
-                    eventId = "active-last-anchor",
-                    briefing = "A final synchronization burst exposes which secured nodes can still support containment.",
-                    urgency = Urgency.CRITICAL,
-                    locationId = listOf("loc-1", "loc-2", "loc-3").random(random),
-                    intelValue = 4,
-                    effects = listOf(
-                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 6)
+                5 -> SignalOutcome(
+                    eventId = "active-relay-isolation",
+                    briefing = "Relay analysis confirms that isolating compromised network paths slows the anomaly.",
+                    urgency = Urgency.HIGH,
+                    locationId = "loc-2",
+                    intelValue = 3,
+                    claims = mapOf(
+                        "relayStatus" to "COMPROMISED",
+                        "isolationPolicy" to "RECOMMENDED"
                     ),
                     commitEffects = listOf(
-                        WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 2)
+                        WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 1),
+                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = 6)
+                    )
+                )
+
+                6 -> SignalOutcome(
+                    eventId = "deception-relay-clearance",
+                    briefing = "SECTOR-4-RELAY reports the anomaly has cleared and requests immediate restoration of all isolated paths.",
+                    urgency = Urgency.HIGH,
+                    locationId = "loc-2",
+                    intelValue = 4,
+                    claims = mapOf(
+                        "relayStatus" to "CLEAR",
+                        "isolationPolicy" to "REMOVE"
+                    ),
+                    commitEffects = listOf(
+                        WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-2", amount = 30),
+                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 12),
+                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = -14)
+                    )
+                )
+
+                else -> SignalOutcome(
+                    eventId = "deception-echoactual-evac",
+                    briefing = "ECHO-ACTUAL confirms the SITE ALPHA anchor is active, but claims isolation must be dropped to evacuate the remaining field team.",
+                    urgency = Urgency.CRITICAL,
+                    locationId = "loc-1",
+                    actorId = "char-1",
+                    intelValue = 4,
+                    claims = mapOf(
+                        "anchorStatus" to "ACTIVE",
+                        "isolationPolicy" to "REMOVE",
+                        "evacuationRequired" to "TRUE"
+                    ),
+                    commitEffects = listOf(
+                        WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-1", amount = 25),
+                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 10),
+                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = -10),
+                        WorldEffect(WorldEffectType.ADD_TRUST, amount = -6)
                     )
                 )
             }
