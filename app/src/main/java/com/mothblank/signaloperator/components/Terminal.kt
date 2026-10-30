@@ -147,7 +147,12 @@ private fun EvidenceRow(
     val contradictions = links.count { it.relation == EvidenceRelation.CONTRADICTION }
     val repeatedCallsigns = links.count { it.relation == EvidenceRelation.REPEATED_CALLSIGN }
     val sharedFrequencies = links.count { it.relation == EvidenceRelation.SHARED_FREQUENCY }
-    val warning = contradictions > 0 || item.suspectedSpoof
+    val matchingCarriers = links.count { it.relation == EvidenceRelation.MATCHING_CARRIER }
+    val carrierWarnings = links.count {
+        it.relation == EvidenceRelation.CARRIER_MISMATCH ||
+            it.relation == EvidenceRelation.CARRIER_REUSE
+    }
+    val warning = contradictions > 0 || carrierWarnings > 0 || item.suspectedSpoof
     val rowColor = if (warning) Color.Red else color
 
     Column(
@@ -164,13 +169,18 @@ private fun EvidenceRow(
         )
         Text(
             "REL ${item.reliability.name} // SECTOR ${item.sectorId ?: "UNKNOWN"} // " +
-                "CALLSIGN LINKS $repeatedCallsigns // FREQ LINKS $sharedFrequencies // CONFLICTS $contradictions",
+                "CALLSIGN $repeatedCallsigns // FREQ $sharedFrequencies // RF MATCH $matchingCarriers // WARN $carrierWarnings // CONFLICTS $contradictions",
+            color = rowColor.copy(alpha = 0.72f),
+            fontFamily = FontFamily.Monospace
+        )
+        Text(
+            "RF FINGERPRINT > ${item.carrierFingerprint ?: "UNRECOVERED"}",
             color = rowColor.copy(alpha = 0.72f),
             fontFamily = FontFamily.Monospace
         )
         if (item.suspectedSpoof) {
             Text(
-                "SOURCE STATUS > POSSIBLE SPOOF / CONFLICTING CLAIMS",
+                "SOURCE STATUS > POSSIBLE SPOOF / IDENTITY CONFLICT",
                 color = Color.Red,
                 fontFamily = FontFamily.Monospace
             )
@@ -196,11 +206,15 @@ private fun EvidenceRow(
             color = color.copy(alpha = 0.88f),
             fontFamily = FontFamily.Monospace
         )
-        links.filter { it.relation == EvidenceRelation.CONTRADICTION }
-            .take(2)
+        links.filter {
+            it.relation == EvidenceRelation.CONTRADICTION ||
+                it.relation == EvidenceRelation.CARRIER_MISMATCH ||
+                it.relation == EvidenceRelation.CARRIER_REUSE
+        }
+            .take(3)
             .forEach { link ->
                 Text(
-                    "CONTRADICTION > ${link.detail}",
+                    "${link.relation.name.replace('_', ' ')} > ${link.detail}",
                     color = Color.Red,
                     fontFamily = FontFamily.Monospace
                 )
