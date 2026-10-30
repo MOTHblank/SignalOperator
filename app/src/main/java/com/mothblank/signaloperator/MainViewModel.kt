@@ -734,6 +734,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (currentProgress < 100f && newProgress >= 100f) {
                         audio.playPacketComplete()
                         addLog("PACKET BUFFER COMPLETE. DECODER READY.", LogType.SYSTEM)
+                        if (stabilityValue >= InterceptRecovery.MIN_ACTIONABLE_STABILITY) {
+                            recordEvidence(activeSignalVal)
+                        }
                     }
                 }
             }
@@ -1034,18 +1037,30 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         } else if (calibrationSynced && resolvedStability < InterceptRecovery.PARTIAL_STABILITY) {
             calibrationSynced = false
         }
+
+        if (
+            _gameState.value.downloadProgress >= 100f &&
+            resolvedStability >= InterceptRecovery.MIN_ACTIONABLE_STABILITY
+        ) {
+            recordEvidence(signal)
+        }
     }
 
     private fun recordEvidence(signal: SignalData) {
         if (signal.kind == SignalKind.MUNDANE_BROADCAST) return
 
-        val nextSequence = (_evidence.value.maxOfOrNull { it.sequence } ?: 0L) + 1L
+        val evidenceId = "evidence-" + signal.id
+        val previous = _evidence.value.firstOrNull { it.id == evidenceId }
+        val sequence = previous?.sequence
+            ?: ((_evidence.value.maxOfOrNull { it.sequence } ?: 0L) + 1L)
+
+        val comparisonSet = _evidence.value.filterNot { it.id == evidenceId }
         val rawItem = EvidenceCapture.fromSignal(
             signal = signal,
             stability = stabilityValue,
-            sequence = nextSequence
+            sequence = sequence
         )
-        val assessment = EvidenceCorrelation.assess(_evidence.value, rawItem)
+        val assessment = EvidenceCorrelation.assess(comparisonSet, rawItem)
         val suspiciousRelations = setOf(
             EvidenceRelation.CONTRADICTION,
             EvidenceRelation.CARRIER_MISMATCH,
@@ -1056,29 +1071,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         _evidence.value = EvidenceCorrelation.append(_evidence.value, item)
 
-        val source = item.callsign ?: "UNKNOWN SOURCE"
-        addLog(
-            "EVIDENCE FILED: $source // ${"%.3f".format(Locale.US, item.frequencyMhz)} MHz // ${item.reliability.name}.",
-            LogType.INTERCEPT
-        )
+        val isNew = previous == null
+        val qualityImproved = previous != null &&
+            item.reliability.ordinal < previous.reliability.ordinal
+        val suspicionChanged = previous != null &&
+            previous.suspectedSpoof != item.suspectedSpoof
 
-        val contradictions = assessment.links.filter {
-            it.relation == EvidenceRelation.CONTRADICTION
-        }
-        if (contradictions.isNotEmpty()) {
-            contradictions.take(3).forEach { link ->
-                addLog("CORRELATION WARNING: ${link.detail}", LogType.INTERCEPT)
-            }
+        if (isNew || qualityImproved) {
+            val source = item.callsign ?: "UNKNOWN SOURCE"
+            val verb = if (isNew) "FILED" else "UPDATED"
+            addLog(
+                "EVIDENCE $verb: $source // ${"%.3f".format(Locale.US, item.frequencyMhz)} MHz // ${item.reliability.name}.",
+                LogType.INTERCEPT
+            )
         }
 
-        assessment.warnings
-            .filterNot { warning ->
-                contradictions.isNotEmpty() && warning.startsWith("Contradictory reports")
-            }
-            .take(3)
-            .forEach { warning ->
+        if (isNew || suspicionChanged) {
+            assessment.links
+                .filter { it.relation in suspiciousRelations }
+                .take(3)
+                .forEach { link ->
+                    addLog(
+                        "CORRELATION WARNING: ${link.relation.name.replace('_', ' ')} // ${link.detail}",
+                        LogType.INTERCEPT
+                    )
+                }
+
+            assessment.warnings.take(3).forEach { warning ->
                 addLog("EVIDENCE WARNING: $warning", LogType.INTERCEPT)
             }
+        }
     }
 
     fun handleAction(action: String, solutionInput: String = "") {
@@ -1125,7 +1147,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         if (action == "COMMIT") {
-            recordEvidence(signal)
             audio.playCommit()
             showOperatorFeedback(
                 text = when (signal.kind) {
