@@ -82,7 +82,7 @@ object EvidenceCapture {
             claims = claims,
             carrierFingerprint = recovered.carrierFingerprint,
             missingFields = missing,
-            suspectedSpoof = false
+            suspectedDeception = false
         )
     }
 }
