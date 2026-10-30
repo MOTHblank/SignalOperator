@@ -1046,10 +1046,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             sequence = nextSequence
         )
         val assessment = EvidenceCorrelation.assess(_evidence.value, rawItem)
+        val suspiciousRelations = setOf(
+            EvidenceRelation.CONTRADICTION,
+            EvidenceRelation.CARRIER_MISMATCH,
+            EvidenceRelation.CARRIER_REUSE
+        )
         val item = rawItem.copy(
-            suspectedSpoof = assessment.links.any {
-                it.relation == EvidenceRelation.CONTRADICTION
-            }
+            suspectedSpoof = assessment.links.any { it.relation in suspiciousRelations }
         )
         _evidence.value = EvidenceCorrelation.append(_evidence.value, item)
 
@@ -1187,20 +1190,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             signal.outcome?.briefing?.let {
                 addLog("FIELD EFFECT: $it", LogType.INTERCEPT)
             }
-            if (signal.outcome?.eventId == "active-echo2-spoof") {
+            if (signal.outcome?.eventId?.startsWith("deception-") == true) {
                 addLog(
-                    "POST-ACTION AUTH FAILURE: ECHO-2 SIGNATURE REJECTED AFTER ROUTE EXECUTION.",
+                    "POST-ACTION AUTH FAILURE: CLAIMED SOURCE SIGNATURE REJECTED AFTER EXECUTION.",
                     LogType.ERROR
                 )
                 showOperatorFeedback(
-                    "SPOOF CONFIRMED // ROUTE ALREADY OPEN",
+                    "DECEPTION CONFIRMED // CONSEQUENCE ALREADY APPLIED",
                     FeedbackTone.NEGATIVE,
                     1800L
                 )
             }
-        } else if (signal.outcome?.eventId == "active-echo2-spoof") {
+        } else if (signal.outcome?.eventId?.startsWith("deception-") == true) {
             addLog(
-                "UNVERIFIED ECHO-2 EMERGENCY ROUTE DENIED.",
+                "UNVERIFIED HIGH-RISK REQUEST DENIED PENDING INDEPENDENT AUTHENTICATION.",
                 LogType.ACTION
             )
         }
