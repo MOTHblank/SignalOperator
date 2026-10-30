@@ -524,6 +524,24 @@ class ProceduralSignalEngine {
             SignalKind.MUNDANE_BROADCAST -> null
         }
 
+        if (outcome?.eventId == "active-echo2-spoof") {
+            sender = "ECHO-2"
+            isAnomalous = true
+            metadata = "AUTH: ECHO-2 // PRIORITY OVERRIDE | $metadata"
+        }
+
+        val claims = buildMap {
+            outcome?.actorId?.let { put("actorId", it) }
+            outcome?.locationId?.let { put("reportedLocation", it) }
+            if (outcome?.actorId != null && outcome.locationId != null) {
+                put("actorLocation", outcome.locationId)
+            }
+            if (outcome?.eventId == "active-echo2-spoof") {
+                put("routeRequest", "EXCLUSION_ZONE")
+                put("relayStatus", "COMPROMISED")
+            }
+        }
+
         return SignalData(
             id = id,
             frequency = frequency,
@@ -539,7 +557,8 @@ class ProceduralSignalEngine {
             metadata = metadata,
             kind = signalKind,
             interaction = interaction,
-            outcome = outcome
+            outcome = outcome,
+            claims = claims
         )
     }
 
@@ -705,14 +724,18 @@ class ProceduralSignalEngine {
                 )
 
                 3 -> SignalOutcome(
-                    eventId = "active-relay-isolation",
-                    briefing = "Relay analysis proves the anomaly can be slowed by isolating compromised network paths.",
-                    urgency = Urgency.HIGH,
-                    locationId = "loc-2",
-                    intelValue = 3,
+                    eventId = "active-echo2-spoof",
+                    briefing = "ECHO-2 requests emergency routing through the EXCLUSION ZONE and claims the SECTOR 4 channel is compromised.",
+                    urgency = Urgency.CRITICAL,
+                    locationId = "loc-4",
+                    actorId = "char-2",
+                    intelValue = 4,
                     commitEffects = listOf(
-                        WorldEffect(WorldEffectType.ADD_SECURITY_CHARGES, amount = 1),
-                        WorldEffect(WorldEffectType.ADD_TRUST, amount = 6)
+                        WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-4", amount = 35),
+                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-4"),
+                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 14),
+                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = -12),
+                        WorldEffect(WorldEffectType.ADD_TRUST, amount = -8)
                     )
                 )
 
