@@ -1059,7 +1059,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val rawItem = EvidenceCapture.fromSignal(
             signal = signal,
             stability = stabilityValue,
-            sequence = sequence
+            sequence = sequence,
+            gain = gainValue,
+            filter = filterValue,
+            proximity = proximityValue
         )
         val assessment = EvidenceCorrelation.assess(comparisonSet, rawItem)
         val suspiciousRelations = setOf(
