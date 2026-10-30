@@ -1148,16 +1148,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         if (action == "COMMIT") {
             audio.playCommit()
+            val deceptive = signal.outcome?.eventId?.startsWith("deception-") == true
             showOperatorFeedback(
-                text = when (signal.kind) {
-                    SignalKind.MISSION -> "INTEL ARCHIVED"
-                    SignalKind.DEAD_DROP -> "TELEMETRY RECOVERED"
-                    SignalKind.MUNDANE_BROADCAST -> "CARRIER CLASSIFICATION ERROR"
+                text = when {
+                    deceptive -> "HIGH-RISK REQUEST EXECUTED"
+                    signal.kind == SignalKind.MISSION -> "INTEL ARCHIVED"
+                    signal.kind == SignalKind.DEAD_DROP -> "TELEMETRY RECOVERED"
+                    else -> "CARRIER CLASSIFICATION ERROR"
                 },
-                tone = if (signal.kind == SignalKind.MUNDANE_BROADCAST) {
-                    FeedbackTone.NEGATIVE
-                } else {
-                    FeedbackTone.POSITIVE
+                tone = when {
+                    deceptive -> FeedbackTone.SYSTEM
+                    signal.kind == SignalKind.MUNDANE_BROADCAST -> FeedbackTone.NEGATIVE
+                    else -> FeedbackTone.POSITIVE
                 }
             )
             when (signal.kind) {
@@ -1178,22 +1180,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         } else {
             audio.playDiscard()
+            val deceptive = signal.outcome?.eventId?.startsWith("deception-") == true
             showOperatorFeedback(
-                text = when (signal.kind) {
-                    SignalKind.MISSION -> "MISSION TRAFFIC DROPPED"
-                    SignalKind.DEAD_DROP -> "TELEMETRY PURGED"
-                    SignalKind.MUNDANE_BROADCAST -> "CIVILIAN BAND CLEARED"
+                text = when {
+                    deceptive -> "UNVERIFIED REQUEST DENIED"
+                    signal.kind == SignalKind.MISSION -> "MISSION TRAFFIC DROPPED"
+                    signal.kind == SignalKind.DEAD_DROP -> "TELEMETRY PURGED"
+                    else -> "CIVILIAN BAND CLEARED"
                 },
-                tone = if (signal.kind == SignalKind.MISSION) {
-                    FeedbackTone.NEGATIVE
-                } else {
-                    FeedbackTone.SYSTEM
+                tone = when {
+                    deceptive -> FeedbackTone.POSITIVE
+                    signal.kind == SignalKind.MISSION -> FeedbackTone.NEGATIVE
+                    else -> FeedbackTone.SYSTEM
                 }
             )
-            when (signal.kind) {
-                SignalKind.MISSION -> addLog("MISSION TRAFFIC DELIBERATELY IGNORED.", LogType.ERROR)
-                SignalKind.DEAD_DROP -> addLog("KERNEL TELEMETRY DISCARDED.", LogType.ACTION)
-                SignalKind.MUNDANE_BROADCAST -> addLog("CIVILIAN CARRIER CLEARED.", LogType.ACTION)
+            when {
+                deceptive -> addLog("SUSPICIOUS REQUEST REJECTED. EVIDENCE RETAINED.", LogType.ACTION)
+                signal.kind == SignalKind.MISSION -> addLog("MISSION TRAFFIC DELIBERATELY IGNORED.", LogType.ERROR)
+                signal.kind == SignalKind.DEAD_DROP -> addLog("KERNEL TELEMETRY DISCARDED.", LogType.ACTION)
+                else -> addLog("CIVILIAN CARRIER CLEARED.", LogType.ACTION)
             }
         }
         stopRadioLoop()
