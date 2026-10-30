@@ -10,7 +10,7 @@ import org.json.JSONObject
 object SaveStateManager {
     private const val PREFS_NAME = "signal_operator_save_state"
     private const val KEY_SAVE_DATA = "save_data"
-    private const val CURRENT_SCHEMA_VERSION = 6
+    private const val CURRENT_SCHEMA_VERSION = 7
 
     data class SavedData(
         val gameState: GameState,
@@ -88,6 +88,8 @@ object SaveStateManager {
             json.put("deadDropsRecovered", state.deadDropsRecovered)
             json.put("routineBroadcastsCleared", state.routineBroadcastsCleared)
             json.put("breachesPrevented", state.breachesPrevented)
+            json.put("deceptionsRejected", state.deceptionsRejected)
+            json.put("deceptionsAccepted", state.deceptionsAccepted)
             json.put("endingSummary", state.endingSummary ?: JSONObject.NULL)
 
             // Hotspots
@@ -277,6 +279,8 @@ object SaveStateManager {
             val deadDropsRecovered = json.optInt("deadDropsRecovered", 0)
             val routineBroadcastsCleared = json.optInt("routineBroadcastsCleared", 0)
             val breachesPrevented = json.optInt("breachesPrevented", 0)
+            val deceptionsRejected = json.optInt("deceptionsRejected", 0)
+            val deceptionsAccepted = json.optInt("deceptionsAccepted", 0)
             val endingSummary = json.optString("endingSummary", "").takeIf { it.isNotBlank() }
 
             // Hotspots
@@ -405,6 +409,8 @@ object SaveStateManager {
                 deadDropsRecovered = deadDropsRecovered,
                 routineBroadcastsCleared = routineBroadcastsCleared,
                 breachesPrevented = breachesPrevented,
+                deceptionsRejected = deceptionsRejected,
+                deceptionsAccepted = deceptionsAccepted,
                 endingSummary = endingSummary,
                 isMapViewActive = false,
                 activeRouterGame = null,
