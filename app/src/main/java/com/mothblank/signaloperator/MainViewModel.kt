@@ -10,6 +10,7 @@ import com.mothblank.signaloperator.audio.RadioAudioCoordinator
 import com.mothblank.signaloperator.engine.DialogueCue
 import com.mothblank.signaloperator.engine.EvidenceCapture
 import com.mothblank.signaloperator.engine.EvidenceCorrelation
+import com.mothblank.signaloperator.engine.EvidenceDisposition
 import com.mothblank.signaloperator.engine.EvidenceRelation
 import com.mothblank.signaloperator.engine.InterceptEvidence
 import com.mothblank.signaloperator.engine.InterceptRecovery
@@ -1067,7 +1068,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             EvidenceRelation.CARRIER_REUSE
         )
         val item = rawItem.copy(
-            suspectedSpoof = assessment.links.any { it.relation in suspiciousRelations }
+            suspectedSpoof = assessment.links.any { it.relation in suspiciousRelations },
+            operatorDisposition = previous?.operatorDisposition ?: EvidenceDisposition.UNREVIEWED
         )
         _evidence.value = EvidenceCorrelation.append(_evidence.value, item)
 
@@ -1101,6 +1103,28 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 addLog("EVIDENCE WARNING: $warning", LogType.INTERCEPT)
             }
         }
+    }
+
+    fun setEvidenceDisposition(
+        evidenceId: String,
+        disposition: EvidenceDisposition
+    ) {
+        val current = _evidence.value
+        val target = current.firstOrNull { it.id == evidenceId } ?: return
+        if (target.operatorDisposition == disposition) return
+
+        _evidence.value = current.map { item ->
+            if (item.id == evidenceId) {
+                item.copy(operatorDisposition = disposition)
+            } else {
+                item
+            }
+        }
+        addLog(
+            "OPERATOR NOTE: EVIDENCE #${target.sequence} MARKED ${disposition.name}.",
+            LogType.ACTION
+        )
+        saveGame()
     }
 
     fun handleAction(action: String, solutionInput: String = "") {
