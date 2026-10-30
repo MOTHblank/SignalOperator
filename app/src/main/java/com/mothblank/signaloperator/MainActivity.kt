@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
             val gameState by viewModel.gameState.collectAsState()
             val logs by viewModel.logs.collectAsState()
             val importantLogs by viewModel.importantLogs.collectAsState()
+            val evidence by viewModel.evidence.collectAsState()
             val operatorFeedback by viewModel.operatorFeedback.collectAsState()
             val saveError by viewModel.saveError.collectAsState()
             val bootStep by viewModel.bootStep.collectAsState()
@@ -373,11 +374,12 @@ class MainActivity : ComponentActivity() {
 
                         // SECTION 4: TERMINAL
                         Terminal(
-                            logs     = logs,
+                            logs = logs,
                             importantLogs = importantLogs,
-                            color    = currentColor,
+                            evidence = evidence,
+                            color = currentColor,
                             onLogClick = { viewModel.selectLogEntry(it) },
-                            modifier = Modifier.height(100.dp).fillMaxWidth().padding(top = 8.dp, bottom = 12.dp)
+                            modifier = Modifier.height(160.dp).fillMaxWidth().padding(top = 8.dp, bottom = 12.dp)
                         )
                     }
                 }
