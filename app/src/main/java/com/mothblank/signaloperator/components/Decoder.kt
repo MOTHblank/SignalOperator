@@ -14,6 +14,10 @@ import com.mothblank.signaloperator.models.SignalKind
 import com.mothblank.signaloperator.models.Urgency
 import com.mothblank.signaloperator.engine.InterceptQuality
 import com.mothblank.signaloperator.engine.InterceptRecovery
+import com.mothblank.signaloperator.engine.EvidenceCapture
+import com.mothblank.signaloperator.engine.EvidenceCorrelation
+import com.mothblank.signaloperator.engine.EvidenceRelation
+import com.mothblank.signaloperator.engine.InterceptEvidence
 import kotlinx.coroutines.delay
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
@@ -169,6 +173,7 @@ fun Decoder(
     proximity: Float,
     downloadProgress: Float,
     color: Color,
+    evidence: List<InterceptEvidence> = emptyList(),
     onAction: (String, String) -> Unit,
     onShowHint: (String, String) -> Unit
 ) {
@@ -271,6 +276,25 @@ fun Decoder(
                 }
             } else {
                 val recovered = InterceptRecovery.recover(signal, stability)
+                val previewEvidence = remember(signal.id, stability, evidence) {
+                    EvidenceCapture.fromSignal(
+                        signal = signal,
+                        stability = stability,
+                        sequence = 0L
+                    )
+                }
+                val previewAssessment = remember(signal.id, stability, evidence) {
+                    EvidenceCorrelation.assess(
+                        evidence.filterNot { it.id == previewEvidence.id },
+                        previewEvidence
+                    )
+                }
+                val crossCheckWarnings = previewAssessment.links.filter {
+                    it.relation == EvidenceRelation.CONTRADICTION ||
+                        it.relation == EvidenceRelation.CARRIER_MISMATCH ||
+                        it.relation == EvidenceRelation.CARRIER_REUSE
+                }
+
                 if (!recovered.actionable) {
                     Text(
                         "PAYLOAD UNRECOVERABLE. STABILIZE TO ${InterceptRecovery.MIN_ACTIONABLE_STABILITY.toInt()}%+.", 
@@ -290,6 +314,34 @@ fun Decoder(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+
+                if (crossCheckWarnings.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, CrtRed.copy(alpha = 0.7f))
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            "INTELLIGENCE CROSS-CHECK // CAUTION",
+                            color = CrtRed,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                        crossCheckWarnings.take(3).forEach { link ->
+                            Text(
+                                "• ${link.relation.name.replace('_', ' ')}: ${link.detail}",
+                                color = CrtRed.copy(alpha = 0.9f),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Text(
+                            "Matching metadata is evidence, not proof. Commit or discard remains an operator decision.",
+                            color = color.copy(alpha = 0.65f),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
 
                 val qualityColor = when (recovered.quality) {
                     InterceptQuality.CLEAR -> color
