@@ -94,7 +94,8 @@ data class SignalData(
     val metadata: String,
     val kind: SignalKind = SignalKind.MISSION,
     val interaction: PuzzleInteraction = PuzzleInteraction.TEXT_ENTRY,
-    val outcome: SignalOutcome? = null
+    val outcome: SignalOutcome? = null,
+    val claims: Map<String, String> = emptyMap()
 )
 
 data class KnownFrequency(
