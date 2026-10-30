@@ -111,7 +111,7 @@ object EvidenceCorrelation {
             warnings += "Intercept quality is uncertain; claims are not confirmed."
         if (incoming.missingFields.isNotEmpty())
             warnings += "Missing fields: " + incoming.missingFields.sorted().joinToString(", ")
-        if (incoming.suspectedSpoof)
+        if (incoming.suspectedDeception)
             warnings += "Possible impersonation; independently verify source."
         if (links.any { it.relation == EvidenceRelation.CONTRADICTION })
             warnings += "Contradictory reports; neither is automatically authoritative."
