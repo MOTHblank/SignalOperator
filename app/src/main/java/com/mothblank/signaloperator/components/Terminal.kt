@@ -19,54 +19,176 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.mothblank.signaloperator.engine.EvidenceCorrelation
+import com.mothblank.signaloperator.engine.EvidenceLink
+import com.mothblank.signaloperator.engine.EvidenceRelation
+import com.mothblank.signaloperator.engine.InterceptEvidence
 import com.mothblank.signaloperator.models.LogEntry
-
-import androidx.compose.ui.tooling.preview.Preview
 import com.mothblank.signaloperator.models.LogType
+import androidx.compose.ui.tooling.preview.Preview
+import java.util.Locale
 import java.util.UUID
+
+private enum class TerminalMode { RECENT, ARCHIVE, EVIDENCE }
 
 @Composable
 fun Terminal(
-    logs: List<LogEntry>, 
-    color: Color, 
+    logs: List<LogEntry>,
+    color: Color,
     onLogClick: (LogEntry) -> Unit,
     modifier: Modifier = Modifier,
-    importantLogs: List<LogEntry> = emptyList()
+    importantLogs: List<LogEntry> = emptyList(),
+    evidence: List<InterceptEvidence> = emptyList()
 ) {
-    var showArchive by remember { mutableStateOf(false) }
-    val visible = if (showArchive) importantLogs else logs
+    var mode by remember { mutableStateOf(TerminalMode.RECENT) }
+    val retainedEvidence = remember(evidence) { EvidenceCorrelation.retain(evidence) }
+    val evidenceLinks = remember(retainedEvidence) {
+        retainedEvidence.flatMapIndexed { index, item ->
+            EvidenceCorrelation.assess(retainedEvidence.take(index), item).links
+        }.distinct()
+    }
+    val linksByEvidence = remember(evidenceLinks) {
+        buildMap<String, MutableList<EvidenceLink>> {
+            evidenceLinks.forEach { link ->
+                getOrPut(link.earlierId) { mutableListOf() }.add(link)
+                getOrPut(link.laterId) { mutableListOf() }.add(link)
+            }
+        }
+    }
+
+    val visibleLogs = when (mode) {
+        TerminalMode.RECENT -> logs
+        TerminalMode.ARCHIVE -> importantLogs
+        TerminalMode.EVIDENCE -> emptyList()
+    }
+
     Column(
         modifier = modifier.fillMaxWidth().border(1.dp, color).padding(8.dp)
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(
-                "RECENT [${logs.size}]",
-                modifier = Modifier.clickable { showArchive = false },
-                color = if (!showArchive) color else color.copy(alpha = 0.5f),
-                fontFamily = FontFamily.Monospace
-            )
-            Text(
-                "ARCHIVE [${importantLogs.size}]",
-                modifier = Modifier.clickable { showArchive = true },
-                color = if (showArchive) color else color.copy(alpha = 0.5f),
-                fontFamily = FontFamily.Monospace
-            )
+        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            TerminalTab("RECENT [${logs.size}]", mode == TerminalMode.RECENT, color) {
+                mode = TerminalMode.RECENT
+            }
+            TerminalTab("ARCHIVE [${importantLogs.size}]", mode == TerminalMode.ARCHIVE, color) {
+                mode = TerminalMode.ARCHIVE
+            }
+            TerminalTab("EVIDENCE [${retainedEvidence.size}]", mode == TerminalMode.EVIDENCE, color) {
+                mode = TerminalMode.EVIDENCE
+            }
         }
-        LazyColumn(reverseLayout = true, modifier = Modifier.weight(1f)) {
-            if (visible.isEmpty()) {
-                item {
-                    Text(
-                        "[--:--:--] ${if (showArchive) "NO ARCHIVED INTELLIGENCE" else "SESSION LOG EMPTY"}.",
-                        color = color.copy(alpha = 0.42f),
-                        fontFamily = FontFamily.Monospace
-                    )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        if (mode == TerminalMode.EVIDENCE) {
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                if (retainedEvidence.isEmpty()) {
+                    item {
+                        Text(
+                            "[NO CORRELATED INTERCEPTS FILED]",
+                            color = color.copy(alpha = 0.42f),
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                } else {
+                    items(retainedEvidence.asReversed(), key = { it.id }) { item ->
+                        EvidenceRow(
+                            item = item,
+                            links = linksByEvidence[item.id].orEmpty(),
+                            color = color
+                        )
+                    }
                 }
-            } else {
-                items(visible.reversed(), key = { it.id }) { log ->
-                    TerminalRow(log = log, color = color, onClick = { onLogClick(log) })
+            }
+        } else {
+            LazyColumn(reverseLayout = true, modifier = Modifier.weight(1f)) {
+                if (visibleLogs.isEmpty()) {
+                    item {
+                        Text(
+                            if (mode == TerminalMode.ARCHIVE) {
+                                "[--:--:--] NO ARCHIVED INTELLIGENCE."
+                            } else {
+                                "[--:--:--] SESSION LOG EMPTY."
+                            },
+                            color = color.copy(alpha = 0.42f),
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                } else {
+                    items(visibleLogs.reversed(), key = { it.id }) { log ->
+                        TerminalRow(log = log, color = color, onClick = { onLogClick(log) })
+                    }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TerminalTab(
+    text: String,
+    selected: Boolean,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Text(
+        text = text,
+        modifier = Modifier.clickable(onClick = onClick),
+        color = if (selected) color else color.copy(alpha = 0.48f),
+        fontFamily = FontFamily.Monospace
+    )
+}
+
+@Composable
+private fun EvidenceRow(
+    item: InterceptEvidence,
+    links: List<EvidenceLink>,
+    color: Color
+) {
+    val contradictions = links.count { it.relation == EvidenceRelation.CONTRADICTION }
+    val repeatedCallsigns = links.count { it.relation == EvidenceRelation.REPEATED_CALLSIGN }
+    val sharedFrequencies = links.count { it.relation == EvidenceRelation.SHARED_FREQUENCY }
+    val warning = contradictions > 0 || item.suspectedSpoof
+    val rowColor = if (warning) Color.Red else color
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, rowColor.copy(alpha = 0.28f))
+            .padding(horizontal = 6.dp, vertical = 4.dp)
+    ) {
+        Text(
+            "#${item.sequence} // ${item.callsign ?: "UNKNOWN SOURCE"} // " +
+                String.format(Locale.US, "%.3f", item.frequencyMhz) + " MHz",
+            color = rowColor,
+            fontFamily = FontFamily.Monospace
+        )
+        Text(
+            "REL ${item.reliability.name} // SECTOR ${item.sectorId ?: "UNKNOWN"} // " +
+                "CALLSIGN LINKS $repeatedCallsigns // FREQ LINKS $sharedFrequencies // CONFLICTS $contradictions",
+            color = rowColor.copy(alpha = 0.72f),
+            fontFamily = FontFamily.Monospace
+        )
+        if (item.missingFields.isNotEmpty()) {
+            Text(
+                "MISSING > ${item.missingFields.sorted().joinToString(", ")}",
+                color = Color.Red.copy(alpha = 0.82f),
+                fontFamily = FontFamily.Monospace
+            )
+        }
+        Text(
+            item.message,
+            color = color.copy(alpha = 0.88f),
+            fontFamily = FontFamily.Monospace
+        )
+        links.filter { it.relation == EvidenceRelation.CONTRADICTION }
+            .take(2)
+            .forEach { link ->
+                Text(
+                    "CONTRADICTION > ${link.detail}",
+                    color = Color.Red,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
     }
 }
 
