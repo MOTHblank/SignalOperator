@@ -10,7 +10,7 @@ import org.json.JSONObject
 object SaveStateManager {
     private const val PREFS_NAME = "signal_operator_save_state"
     private const val KEY_SAVE_DATA = "save_data"
-    private const val CURRENT_SCHEMA_VERSION = 7
+    private const val CURRENT_SCHEMA_VERSION = 8
 
     data class SavedData(
         val gameState: GameState,
@@ -204,6 +204,7 @@ object SaveStateManager {
         put("reliability", item.reliability.name)
         put("carrierFingerprint", item.carrierFingerprint ?: JSONObject.NULL)
         put("suspectedSpoof", item.suspectedSpoof)
+        put("operatorDisposition", item.operatorDisposition.name)
 
         val claimsObject = JSONObject()
         item.claims.forEach { (key, value) -> claimsObject.put(key, value) }
@@ -246,7 +247,12 @@ object SaveStateManager {
             claims = claims,
             carrierFingerprint = if (json.isNull("carrierFingerprint")) null else json.optString("carrierFingerprint"),
             missingFields = missing,
-            suspectedSpoof = json.optBoolean("suspectedSpoof", false)
+            suspectedSpoof = json.optBoolean("suspectedSpoof", false),
+            operatorDisposition = runCatching {
+                EvidenceDisposition.valueOf(
+                    json.optString("operatorDisposition", EvidenceDisposition.UNREVIEWED.name)
+                )
+            }.getOrDefault(EvidenceDisposition.UNREVIEWED)
         )
     }
 
