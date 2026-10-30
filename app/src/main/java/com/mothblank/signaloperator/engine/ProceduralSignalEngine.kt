@@ -537,6 +537,11 @@ class ProceduralSignalEngine {
                 sender = "SECTOR-4-RELAY"
                 metadata = "AUTH: RELAY // VERIFIED BASELINE | $metadata"
             }
+            "compromised-echo2-anchor" -> {
+                sender = "ECHO-2"
+                isAnomalous = true
+                metadata = "AUTH: ECHO-2 // SIGNATURE VERIFIED | $metadata"
+            }
             "deception-echo2-route" -> {
                 sender = "ECHO-2"
                 isAnomalous = true
@@ -766,6 +771,7 @@ class ProceduralSignalEngine {
                     locationId = "loc-4",
                     actorId = "char-2",
                     intelValue = 4,
+                    risk = TransmissionRisk.SPOOF,
                     claims = mapOf(
                         "actorLocation" to "loc-4",
                         "routeRequest" to "EXCLUSION_ZONE",
@@ -781,18 +787,27 @@ class ProceduralSignalEngine {
                 )
 
                 4 -> SignalOutcome(
-                    eventId = "active-subject-proximity",
-                    briefing = "THE SUBJECT is not inside the exclusion zone. The signal origin is converging on the operator terminal.",
+                    eventId = "compromised-echo2-anchor",
+                    briefing = "ECHO-2 correctly reports THE SUBJECT converging on the operator terminal, but insists the SITE ALPHA anchor has failed and must be shut down.",
                     urgency = Urgency.CRITICAL,
-                    actorId = "char-3",
+                    locationId = "loc-1",
+                    actorId = "char-2",
                     intelValue = 4,
+                    risk = TransmissionRisk.COMPROMISED_SOURCE,
                     claims = mapOf(
+                        "actorLocation" to "loc-2",
                         "subjectLocation" to "OPERATOR_TERMINAL",
-                        "subjectInExclusionZone" to "FALSE"
+                        "anchorStatus" to "FAILED",
+                        "containmentAdvice" to "DISABLE_SITE_ALPHA"
                     ),
                     effects = listOf(
-                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 18),
-                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = -12)
+                        WorldEffect(WorldEffectType.ADD_EXPOSURE, amount = 8)
+                    ),
+                    commitEffects = listOf(
+                        WorldEffect(WorldEffectType.ADD_LOCATION_THREAT, targetId = "loc-1", amount = 25),
+                        WorldEffect(WorldEffectType.MARK_LOCATION_INVESTIGATING, targetId = "loc-1"),
+                        WorldEffect(WorldEffectType.ADD_CONTAINMENT, amount = -14),
+                        WorldEffect(WorldEffectType.ADD_TRUST, amount = -5)
                     )
                 )
 
@@ -818,6 +833,7 @@ class ProceduralSignalEngine {
                     urgency = Urgency.HIGH,
                     locationId = "loc-2",
                     intelValue = 4,
+                    risk = TransmissionRisk.SPOOF,
                     claims = mapOf(
                         "relayStatus" to "CLEAR",
                         "isolationPolicy" to "REMOVE"
@@ -836,6 +852,7 @@ class ProceduralSignalEngine {
                     locationId = "loc-1",
                     actorId = "char-1",
                     intelValue = 4,
+                    risk = TransmissionRisk.SPOOF,
                     claims = mapOf(
                         "anchorStatus" to "ACTIVE",
                         "isolationPolicy" to "REMOVE",
