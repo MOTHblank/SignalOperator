@@ -168,10 +168,26 @@ private fun EvidenceRow(
             color = rowColor.copy(alpha = 0.72f),
             fontFamily = FontFamily.Monospace
         )
+        if (item.suspectedSpoof) {
+            Text(
+                "SOURCE STATUS > POSSIBLE SPOOF / CONFLICTING CLAIMS",
+                color = Color.Red,
+                fontFamily = FontFamily.Monospace
+            )
+        }
         if (item.missingFields.isNotEmpty()) {
             Text(
                 "MISSING > ${item.missingFields.sorted().joinToString(", ")}",
                 color = Color.Red.copy(alpha = 0.82f),
+                fontFamily = FontFamily.Monospace
+            )
+        }
+        if (item.claims.isNotEmpty()) {
+            Text(
+                "CLAIMS > " + item.claims.entries
+                    .sortedBy { it.key }
+                    .joinToString(" // ") { (key, value) -> "${key.uppercase()}=$value" },
+                color = rowColor.copy(alpha = 0.68f),
                 fontFamily = FontFamily.Monospace
             )
         }
