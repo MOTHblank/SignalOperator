@@ -47,6 +47,12 @@ enum class Urgency {
     CRITICAL
 }
 
+enum class TransmissionRisk {
+    NONE,
+    SPOOF,
+    COMPROMISED_SOURCE
+}
+
 enum class WorldEffectType {
     ADD_LOCATION_THREAT,
     ADD_LOCATION_SECURITY,
@@ -75,6 +81,7 @@ data class SignalOutcome(
     val locationId: String? = null,
     val actorId: String? = null,
     val intelValue: Int = 1,
+    val risk: TransmissionRisk = TransmissionRisk.NONE,
     val claims: Map<String, String> = emptyMap(),
     val effects: List<WorldEffect> = emptyList(),
     val commitEffects: List<WorldEffect> = emptyList()
