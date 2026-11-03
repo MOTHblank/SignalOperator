@@ -10,7 +10,7 @@ import org.json.JSONObject
 object SaveStateManager {
     private const val PREFS_NAME = "signal_operator_save_state"
     private const val KEY_SAVE_DATA = "save_data"
-    private const val CURRENT_SCHEMA_VERSION = 8
+    private const val CURRENT_SCHEMA_VERSION = 9
 
     data class SavedData(
         val gameState: GameState,
@@ -158,11 +158,18 @@ object SaveStateManager {
             retainedLogs.important.forEach { importantArray.put(encodeLog(it)) }
             json.put("importantLogs", importantArray)
 
-            val evidenceArray = JSONArray()
-            EvidenceCorrelation.retain(evidence).forEach { item ->
-                evidenceArray.put(encodeEvidence(item))
+            val recentEvidence = JSONArray()
+            EvidenceCorrelation.activeWindow(evidence).forEach { item ->
+                recentEvidence.put(encodeEvidence(item))
             }
-            json.put("evidence", evidenceArray)
+            json.put("evidence", recentEvidence)
+
+            // Older records have a compact positional representation, but are not discarded.
+            val archivedEvidence = JSONArray()
+            EvidenceCorrelation.archive(evidence).forEach { item ->
+                archivedEvidence.put(encodeArchivedEvidence(item))
+            }
+            json.put("evidenceArchive", archivedEvidence)
 
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             // commit() reports actual persistence failures; apply() only enqueues a write.
@@ -209,11 +216,57 @@ object SaveStateManager {
         val claimsObject = JSONObject()
         item.claims.forEach { (key, value) -> claimsObject.put(key, value) }
         put("claims", claimsObject)
+        put("claimProvenance", encodeClaimProvenance(item.claimProvenance))
 
         val missingArray = JSONArray()
         item.missingFields.sorted().forEach { missingArray.put(it) }
         put("missingFields", missingArray)
     }
+
+    private fun encodeClaimProvenance(observations: Map<String, ClaimObservation>): JSONObject =
+        JSONObject().apply {
+            observations.forEach { (key, observation) ->
+                put(key, JSONArray().apply {
+                    put(observation.category.name)
+                    put(observation.observedSequence)
+                    put(observation.reportedBy ?: JSONObject.NULL)
+                    put(observation.transmissionId ?: JSONObject.NULL)
+                })
+            }
+        }
+
+    private fun encodeArchivedEvidence(item: InterceptEvidence): JSONArray = JSONArray().apply {
+        put(item.id)
+        put(item.sequence)
+        put(item.frequencyMhz.toDouble())
+        put(item.callsign ?: JSONObject.NULL)
+        put(item.sectorId ?: JSONObject.NULL)
+        put(item.message)
+        put(item.reliability.name)
+        put(JSONObject().apply { item.claims.forEach { (key, value) -> put(key, value) } })
+        put(item.carrierFingerprint ?: JSONObject.NULL)
+        put(JSONArray().apply { item.missingFields.sorted().forEach { put(it) } })
+        put(item.suspectedDeception)
+        put(item.operatorDisposition.name)
+        put(encodeClaimProvenance(item.claimProvenance))
+    }
+
+    private fun decodeArchivedEvidence(row: JSONArray): InterceptEvidence =
+        decodeEvidence(JSONObject().apply {
+            put("id", row.getString(0))
+            put("sequence", row.getLong(1))
+            put("frequencyMhz", row.getDouble(2))
+            put("callsign", if (row.isNull(3)) JSONObject.NULL else row.getString(3))
+            put("sectorId", if (row.isNull(4)) JSONObject.NULL else row.getString(4))
+            put("message", row.getString(5))
+            put("reliability", row.getString(6))
+            put("claims", row.getJSONObject(7))
+            put("carrierFingerprint", if (row.isNull(8)) JSONObject.NULL else row.getString(8))
+            put("missingFields", row.getJSONArray(9))
+            put("suspectedDeception", row.getBoolean(10))
+            put("operatorDisposition", row.getString(11))
+            put("claimProvenance", row.optJSONObject(12) ?: JSONObject())
+        })
 
     private fun decodeEvidence(json: JSONObject): InterceptEvidence {
         val claims = mutableMapOf<String, String>()
@@ -222,6 +275,22 @@ object SaveStateManager {
             while (keys.hasNext()) {
                 val key = keys.next()
                 claims[key] = objectJson.optString(key)
+            }
+        }
+        val observations = mutableMapOf<String, ClaimObservation>()
+        json.optJSONObject("claimProvenance")?.let { objectJson ->
+            val keys = objectJson.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = objectJson.optJSONArray(key) ?: continue
+                observations[key] = ClaimObservation(
+                    category = runCatching {
+                        EvidenceClaimCategory.valueOf(value.getString(0))
+                    }.getOrDefault(EvidenceCorrelation.categoryFor(key)),
+                    observedSequence = value.optLong(1, json.optLong("sequence", 0L)),
+                    reportedBy = if (value.isNull(2)) null else value.optString(2),
+                    transmissionId = if (value.isNull(3)) null else value.optString(3)
+                )
             }
         }
         val missing = mutableSetOf<String>()
@@ -255,7 +324,8 @@ object SaveStateManager {
                 EvidenceDisposition.valueOf(
                     json.optString("operatorDisposition", EvidenceDisposition.UNREVIEWED.name)
                 )
-            }.getOrDefault(EvidenceDisposition.UNREVIEWED)
+            }.getOrDefault(EvidenceDisposition.UNREVIEWED),
+            claimProvenance = observations
         )
     }
 
@@ -405,7 +475,13 @@ object SaveStateManager {
                     evidence += decodeEvidence(array.getJSONObject(i))
                 }
             }
-            val retainedEvidence = EvidenceCorrelation.retain(evidence)
+            val archivedEvidence = mutableListOf<InterceptEvidence>()
+            json.optJSONArray("evidenceArchive")?.let { array ->
+                for (i in 0 until array.length()) {
+                    archivedEvidence += decodeArchivedEvidence(array.getJSONArray(i))
+                }
+            }
+            val retainedEvidence = EvidenceCorrelation.retain(archivedEvidence + evidence)
 
             val gameState = GameState(
                 phase = phase,

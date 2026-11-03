@@ -82,7 +82,15 @@ object EvidenceCapture {
             claims = claims,
             carrierFingerprint = recovered.carrierFingerprint,
             missingFields = missing,
-            suspectedDeception = false
+            suspectedDeception = false,
+            claimProvenance = claims.keys.associateWith { key ->
+                ClaimObservation(
+                    category = EvidenceCorrelation.categoryFor(key),
+                    observedSequence = sequence,
+                    reportedBy = recovered.sender.takeUnless { it.startsWith("[SOURCE") },
+                    transmissionId = signal.id
+                )
+            }
         )
     }
 }

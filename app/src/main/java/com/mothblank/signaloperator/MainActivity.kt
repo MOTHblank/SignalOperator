@@ -387,7 +387,7 @@ class MainActivity : ComponentActivity() {
                             onEvidenceDisposition = { id, disposition ->
                                 viewModel.setEvidenceDisposition(id, disposition)
                             },
-                            modifier = Modifier.height(160.dp).fillMaxWidth().padding(top = 8.dp, bottom = 12.dp)
+                            modifier = Modifier.height(210.dp).fillMaxWidth().padding(top = 8.dp, bottom = 12.dp)
                         )
                     }
                 }
