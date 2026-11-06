@@ -601,7 +601,7 @@ class ProceduralSignalEngine {
             ?.firstOrNull { it.id == "char-2" }
             ?.status == CharacterStatus.ACTIVE
 
-        return when (phase) {
+        val outcome = when (phase) {
             GamePhase.APTITUDE_TEST -> {
                 val targetId = if (solvedPuzzlesCount % 2 == 0) "loc-1" else "loc-3"
                 SignalOutcome(
@@ -709,7 +709,12 @@ class ProceduralSignalEngine {
                 )
             }
 
-            GamePhase.ACTIVE_INVESTIGATION -> when (solvedPuzzlesCount % 8) {
+            GamePhase.ACTIVE_INVESTIGATION -> when (
+                AdversaryDirector.selectActiveInvestigationSlot(
+                    solvedPuzzlesCount % 8,
+                    worldState?.adversaryStrategy
+                )
+            ) {
                 0 -> SignalOutcome(
                     eventId = "active-echo2-voiceprint",
                     briefing = "Voiceprint drift suggests ECHO-2 may no longer be the sole source of ECHO-2 transmissions.",
@@ -879,6 +884,15 @@ class ProceduralSignalEngine {
                 briefing = "No further operational effect.",
                 intelValue = 0
             )
+        }
+
+        return if (outcome.risk != TransmissionRisk.NONE) {
+            outcome.copy(
+                commitEffects = outcome.commitEffects +
+                    AdversaryDirector.pressureEffects(worldState?.adversaryStrategy)
+            )
+        } else {
+            outcome
         }
     }
 }
