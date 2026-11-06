@@ -90,6 +90,27 @@ object GameSessionReducer {
             }
         }
 
+        if (signal.kind == SignalKind.MISSION) {
+            val risk = signal.outcome?.risk ?: TransmissionRisk.NONE
+            state = state.copy(
+                analysisCycles = (state.analysisCycles + 1)
+                    .coerceAtMost(InvestigationActions.MAX_ANALYSIS_CYCLES),
+                adversaryStrategy = AdversaryDirector.afterSignalResolution(
+                    strategy = state.adversaryStrategy,
+                    risk = risk,
+                    accepted = action == "COMMIT",
+                    locations = state.locations
+                )
+            )
+        } else {
+            state = state.copy(
+                adversaryStrategy = AdversaryDirector.refreshVulnerability(
+                    state.adversaryStrategy,
+                    state.locations
+                )
+            )
+        }
+
         state = state.copy(
             solvedHotspots = solvedHotspots,
             downloadProgress = 0f
@@ -116,7 +137,8 @@ object GameSessionReducer {
                         puzzlesRequired = 8,
                         puzzlesSolved = 0,
                         solvedHotspots = emptySet(),
-                        corruptionLevel = max(state.corruptionLevel, 1f)
+                        corruptionLevel = max(state.corruptionLevel, 1f),
+                        analysisCycles = maxOf(state.analysisCycles, 3)
                     )
                     dialogueCue = DialogueCue.ACTIVE_INVESTIGATION
                 }
