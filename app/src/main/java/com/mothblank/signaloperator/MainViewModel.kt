@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import android.app.Application
 import androidx.lifecycle.viewModelScope
 import com.mothblank.signaloperator.audio.RadioAudioCoordinator
+import com.mothblank.signaloperator.engine.AdversaryDirector
 import com.mothblank.signaloperator.engine.DialogueCue
 import com.mothblank.signaloperator.engine.EvidenceCapture
 import com.mothblank.signaloperator.engine.EvidenceCorrelation
@@ -14,6 +15,8 @@ import com.mothblank.signaloperator.engine.EvidenceDisposition
 import com.mothblank.signaloperator.engine.EvidenceRelation
 import com.mothblank.signaloperator.engine.InterceptEvidence
 import com.mothblank.signaloperator.engine.InterceptRecovery
+import com.mothblank.signaloperator.engine.InvestigationActionType
+import com.mothblank.signaloperator.engine.InvestigationActions
 import com.mothblank.signaloperator.engine.GameSessionReducer
 import com.mothblank.signaloperator.engine.HotspotPlanner
 import com.mothblank.signaloperator.engine.ProceduralSignalEngine
@@ -229,10 +232,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             NetworkLink("link-3", "loc-2", "loc-4"),
             NetworkLink("link-4", "loc-1", "loc-3")
         )
-        _gameState.value = _gameState.value.copy(
+        val state = _gameState.value
+        val strategy = if (state.adversaryStrategy.vulnerableSectorId == null) {
+            AdversaryDirector.initial(state.seed, initialLocations)
+        } else {
+            AdversaryDirector.refreshVulnerability(
+                state.adversaryStrategy,
+                initialLocations
+            )
+        }
+        _gameState.value = state.copy(
             locations = initialLocations,
             characters = initialCharacters,
-            networkLinks = initialLinks
+            networkLinks = initialLinks,
+            adversaryStrategy = strategy
         )
     }
 
@@ -1072,7 +1085,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
         val item = rawItem.copy(
             suspectedDeception = assessment.links.any { it.relation in suspiciousRelations },
-            operatorDisposition = previous?.operatorDisposition ?: EvidenceDisposition.UNREVIEWED
+            operatorDisposition = previous?.operatorDisposition ?: EvidenceDisposition.UNREVIEWED,
+            investigationActions = previous?.investigationActions.orEmpty(),
+            investigationNotes = previous?.investigationNotes.orEmpty(),
+            authenticationStatus = previous?.authenticationStatus
+                ?: rawItem.authenticationStatus
         )
         _evidence.value = EvidenceCorrelation.append(_evidence.value, item)
 
@@ -1127,6 +1144,62 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "OPERATOR NOTE: EVIDENCE #${target.sequence} MARKED ${disposition.name}.",
             LogType.ACTION
         )
+        saveGame()
+    }
+
+    fun investigateEvidence(
+        evidenceId: String,
+        action: InvestigationActionType
+    ) {
+        val state = _gameState.value
+        if (state.phase == GamePhase.APTITUDE_TEST) {
+            showOperatorFeedback(
+                "ANALYSIS SUITE LOCKED // COMPLETE APTITUDE PHASE",
+                FeedbackTone.SYSTEM,
+                1200L
+            )
+            return
+        }
+
+        val target = _evidence.value.firstOrNull { it.id == evidenceId } ?: return
+        val resolution = InvestigationActions.perform(
+            current = state,
+            target = target,
+            allEvidence = _evidence.value,
+            action = action
+        )
+        if (!resolution.performed) {
+            addLog(resolution.summary, LogType.SYSTEM)
+            showOperatorFeedback(resolution.summary, FeedbackTone.SYSTEM, 1200L)
+            return
+        }
+
+        _gameState.value = resolution.state
+        _evidence.value = _evidence.value.map { item ->
+            if (item.id == evidenceId) resolution.evidence else item
+        }
+        resolution.logs.forEach { message ->
+            addLog(
+                message,
+                if (message.startsWith("COUNTERSIGNAL")) LogType.ERROR else LogType.ACTION
+            )
+        }
+
+        audio.playCommit()
+        if (resolution.provokedSectorId != null) {
+            audio.playAlert()
+            showOperatorFeedback(
+                "COUNTERSIGNAL RESPONSE // NETWORK PRESSURE INCREASED",
+                FeedbackTone.NEGATIVE,
+                1800L
+            )
+        } else {
+            showOperatorFeedback(
+                "INVESTIGATION FILED // ${resolution.evidence.authenticationStatus.name}",
+                FeedbackTone.POSITIVE,
+                900L
+            )
+        }
         saveGame()
     }
 
