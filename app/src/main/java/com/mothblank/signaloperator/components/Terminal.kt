@@ -31,6 +31,8 @@ import com.mothblank.signaloperator.engine.EvidenceDisposition
 import com.mothblank.signaloperator.engine.EvidenceLink
 import com.mothblank.signaloperator.engine.EvidenceRelation
 import com.mothblank.signaloperator.engine.InterceptEvidence
+import com.mothblank.signaloperator.engine.InvestigationActionType
+import com.mothblank.signaloperator.engine.InvestigationActions
 import com.mothblank.signaloperator.models.LogEntry
 import com.mothblank.signaloperator.models.LogType
 import androidx.compose.ui.tooling.preview.Preview
@@ -75,7 +77,11 @@ fun Terminal(
     modifier: Modifier = Modifier,
     importantLogs: List<LogEntry> = emptyList(),
     evidence: List<InterceptEvidence> = emptyList(),
-    onEvidenceDisposition: (String, EvidenceDisposition) -> Unit = { _, _ -> }
+    analysisCycles: Int = 0,
+    adversaryAlert: Int = 0,
+    investigationEnabled: Boolean = true,
+    onEvidenceDisposition: (String, EvidenceDisposition) -> Unit = { _, _ -> },
+    onInvestigate: (String, InvestigationActionType) -> Unit = { _, _ -> }
 ) {
     var mode by remember { mutableStateOf(TerminalMode.RECENT) }
     var evidenceFilter by remember { mutableStateOf(EvidenceFilter.ALL) }
@@ -170,6 +176,13 @@ fun Terminal(
                 }
             }
             Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                "ANALYSIS CYCLES " + analysisCycles + "/" +
+                    InvestigationActions.MAX_ANALYSIS_CYCLES +
+                    " // ADVERSARY ALERT " + adversaryAlert + "%",
+                color = if (adversaryAlert >= 60) Color.Red else color.copy(alpha = 0.72f),
+                fontFamily = FontFamily.Monospace
+            )
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.horizontalScroll(rememberScrollState())
@@ -244,6 +257,8 @@ fun Terminal(
                             links = linksFor(item),
                             evidenceById = byId,
                             color = color,
+                            analysisCycles = analysisCycles,
+                            investigationEnabled = investigationEnabled,
                             comparisonAnchor = comparisonAnchor,
                             onPick = {
                                 val anchor = comparisonAnchor
@@ -256,6 +271,9 @@ fun Terminal(
                             onOpenRelated = { other -> openComparison(item.id, other) },
                             onDisposition = { disposition ->
                                 onEvidenceDisposition(item.id, disposition)
+                            },
+                            onInvestigate = { action ->
+                                onInvestigate(item.id, action)
                             }
                         )
                     }
@@ -328,15 +346,41 @@ private fun EvidenceFilterTab(
 }
 
 @Composable
+private fun InvestigationActionTab(
+    text: String,
+    enabled: Boolean,
+    completed: Boolean,
+    color: Color,
+    onClick: () -> Unit
+) {
+    Text(
+        text = if (completed) text + " [FILED]" else text,
+        modifier = Modifier.clickable(
+            enabled = enabled && !completed,
+            onClick = onClick
+        ),
+        color = when {
+            completed -> color.copy(alpha = 0.5f)
+            enabled -> color
+            else -> color.copy(alpha = 0.25f)
+        },
+        fontFamily = FontFamily.Monospace
+    )
+}
+
+@Composable
 private fun EvidenceRow(
     item: InterceptEvidence,
     links: List<EvidenceLink>,
     evidenceById: Map<String, InterceptEvidence>,
     color: Color,
+    analysisCycles: Int,
+    investigationEnabled: Boolean,
     comparisonAnchor: String?,
     onPick: () -> Unit,
     onOpenRelated: (String) -> Unit,
-    onDisposition: (EvidenceDisposition) -> Unit
+    onDisposition: (EvidenceDisposition) -> Unit,
+    onInvestigate: (InvestigationActionType) -> Unit
 ) {
     val contradictions = links.count { it.relation == EvidenceRelation.CONTRADICTION }
     val unresolved = links.count { it.relation == EvidenceRelation.UNRESOLVED_CLAIM }
@@ -406,6 +450,46 @@ private fun EvidenceRow(
                 comparisonAnchor == item.id,
                 color,
                 onPick
+            )
+        }
+        Text(
+            "AUTH " + item.authenticationStatus.name +
+                " // ANALYSIS " + item.investigationActions.size + "/3",
+            color = when (item.authenticationStatus.name) {
+                "FAILED" -> Color.Red
+                "VERIFIED_CARRIER" -> color
+                else -> color.copy(alpha = 0.62f)
+            },
+            fontFamily = FontFamily.Monospace
+        )
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            InvestigationActionTab(
+                "[REPLAY CARRIER // 1]",
+                enabled = investigationEnabled && analysisCycles >= 1,
+                completed = InvestigationActionType.REPLAY_CARRIER in item.investigationActions,
+                color = color
+            ) { onInvestigate(InvestigationActionType.REPLAY_CARRIER) }
+            InvestigationActionTab(
+                "[CALLSIGN XREF // 1]",
+                enabled = investigationEnabled && analysisCycles >= 1,
+                completed = InvestigationActionType.CROSS_REFERENCE_CALLSIGN in item.investigationActions,
+                color = color
+            ) { onInvestigate(InvestigationActionType.CROSS_REFERENCE_CALLSIGN) }
+            InvestigationActionTab(
+                "[AUTH CHALLENGE // 2]",
+                enabled = investigationEnabled && analysisCycles >= 2,
+                completed = InvestigationActionType.AUTHENTICATION_CHALLENGE in item.investigationActions,
+                color = color
+            ) { onInvestigate(InvestigationActionType.AUTHENTICATION_CHALLENGE) }
+        }
+        item.investigationNotes.takeLast(2).forEach { note ->
+            Text(
+                "ANALYSIS > " + note,
+                color = color.copy(alpha = 0.78f),
+                fontFamily = FontFamily.Monospace
             )
         }
         if (item.missingFields.isNotEmpty()) {
