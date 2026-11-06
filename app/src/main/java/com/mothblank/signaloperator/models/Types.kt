@@ -53,6 +53,24 @@ enum class TransmissionRisk {
     COMPROMISED_SOURCE
 }
 
+enum class AdversaryMethod {
+    CALLSIGN_SPOOFING,
+    RELAY_MANIPULATION,
+    COMPROMISED_GUIDANCE
+}
+
+data class AdversaryStrategyState(
+    val doctrine: AdversaryMethod = AdversaryMethod.CALLSIGN_SPOOFING,
+    val alertLevel: Int = 0,
+    val spoofSuccesses: Int = 0,
+    val compromisedSuccesses: Int = 0,
+    val spoofExposures: Int = 0,
+    val compromisedExposures: Int = 0,
+    val deceptionAttempts: Int = 0,
+    val exposedIdentities: Set<String> = emptySet(),
+    val vulnerableSectorId: String? = null
+)
+
 enum class WorldEffectType {
     ADD_LOCATION_THREAT,
     ADD_LOCATION_SECURITY,
@@ -212,6 +230,9 @@ data class GameState(
     val breachesPrevented: Int = 0,
     val deceptionsRejected: Int = 0,
     val deceptionsAccepted: Int = 0,
+    val analysisCycles: Int = 3,
+    val investigationsPerformed: Int = 0,
+    val adversaryStrategy: AdversaryStrategyState = AdversaryStrategyState(),
     val endingSummary: String? = null,
     val isMapViewActive: Boolean = false,
     val activeRouterGame: RouterGameState? = null,
