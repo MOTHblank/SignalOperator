@@ -5,6 +5,17 @@ import kotlin.math.abs
 /** Intercepts are observations, not verified facts or proof of a sender's identity. */
 enum class EvidenceReliability { CLEAR, PARTIAL, DEGRADED, UNVERIFIED }
 enum class EvidenceDisposition { UNREVIEWED, TRUSTED, SUSPICIOUS }
+enum class InvestigationActionType {
+    REPLAY_CARRIER,
+    CROSS_REFERENCE_CALLSIGN,
+    AUTHENTICATION_CHALLENGE
+}
+enum class AuthenticationStatus {
+    NOT_REQUESTED,
+    VERIFIED_CARRIER,
+    FAILED,
+    INCONCLUSIVE
+}
 enum class EvidenceRelation {
     REPEATED_CALLSIGN,
     SHARED_FREQUENCY,
@@ -40,7 +51,10 @@ data class InterceptEvidence(
     val missingFields: Set<String> = emptySet(),
     val suspectedDeception: Boolean = false,
     val operatorDisposition: EvidenceDisposition = EvidenceDisposition.UNREVIEWED,
-    val claimProvenance: Map<String, ClaimObservation> = emptyMap()
+    val claimProvenance: Map<String, ClaimObservation> = emptyMap(),
+    val investigationActions: Set<InvestigationActionType> = emptySet(),
+    val investigationNotes: List<String> = emptyList(),
+    val authenticationStatus: AuthenticationStatus = AuthenticationStatus.NOT_REQUESTED
 )
 
 data class EvidenceLink(
