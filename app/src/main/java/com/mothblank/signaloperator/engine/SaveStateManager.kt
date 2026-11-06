@@ -10,7 +10,7 @@ import org.json.JSONObject
 object SaveStateManager {
     private const val PREFS_NAME = "signal_operator_save_state"
     private const val KEY_SAVE_DATA = "save_data"
-    private const val CURRENT_SCHEMA_VERSION = 9
+    private const val CURRENT_SCHEMA_VERSION = 10
 
     data class SavedData(
         val gameState: GameState,
@@ -90,6 +90,9 @@ object SaveStateManager {
             json.put("breachesPrevented", state.breachesPrevented)
             json.put("deceptionsRejected", state.deceptionsRejected)
             json.put("deceptionsAccepted", state.deceptionsAccepted)
+            json.put("analysisCycles", state.analysisCycles)
+            json.put("investigationsPerformed", state.investigationsPerformed)
+            json.put("adversaryStrategy", encodeAdversaryStrategy(state.adversaryStrategy))
             json.put("endingSummary", state.endingSummary ?: JSONObject.NULL)
 
             // Hotspots
@@ -187,6 +190,58 @@ object SaveStateManager {
         }
     }
 
+    private fun encodeAdversaryStrategy(strategy: AdversaryStrategyState): JSONObject =
+        JSONObject().apply {
+            put("doctrine", strategy.doctrine.name)
+            put("alertLevel", strategy.alertLevel)
+            put("spoofSuccesses", strategy.spoofSuccesses)
+            put("compromisedSuccesses", strategy.compromisedSuccesses)
+            put("spoofExposures", strategy.spoofExposures)
+            put("compromisedExposures", strategy.compromisedExposures)
+            put("deceptionAttempts", strategy.deceptionAttempts)
+            put("vulnerableSectorId", strategy.vulnerableSectorId ?: JSONObject.NULL)
+            put("exposedIdentities", JSONArray().apply {
+                strategy.exposedIdentities.sorted().forEach { put(it) }
+            })
+        }
+
+    private fun decodeAdversaryStrategy(
+        json: JSONObject?,
+        seed: Long,
+        locations: List<Location>
+    ): AdversaryStrategyState {
+        val fallback = AdversaryDirector.initial(seed, locations)
+        if (json == null) return fallback
+
+        val exposed = mutableSetOf<String>()
+        json.optJSONArray("exposedIdentities")?.let { array ->
+            for (i in 0 until array.length()) {
+                array.optString(i).takeIf { it.isNotBlank() }?.let(exposed::add)
+            }
+        }
+        return AdversaryDirector.refreshVulnerability(
+            fallback.copy(
+                doctrine = runCatching {
+                    AdversaryMethod.valueOf(json.optString("doctrine", fallback.doctrine.name))
+                }.getOrDefault(fallback.doctrine),
+                alertLevel = json.optInt("alertLevel", 0).coerceIn(0, 100),
+                spoofSuccesses = json.optInt("spoofSuccesses", 0).coerceAtLeast(0),
+                compromisedSuccesses = json.optInt("compromisedSuccesses", 0).coerceAtLeast(0),
+                spoofExposures = json.optInt("spoofExposures", 0).coerceAtLeast(0),
+                compromisedExposures = json.optInt("compromisedExposures", 0).coerceAtLeast(0),
+                deceptionAttempts = json.optInt("deceptionAttempts", 0).coerceAtLeast(0),
+                exposedIdentities = exposed,
+                vulnerableSectorId = if (json.isNull("vulnerableSectorId")) {
+                    fallback.vulnerableSectorId
+                } else {
+                    json.optString("vulnerableSectorId").takeIf { it.isNotBlank() }
+                        ?: fallback.vulnerableSectorId
+                }
+            ),
+            locations
+        )
+    }
+
     private fun encodeLog(entry: LogEntry): JSONObject = JSONObject().apply {
         put("id", entry.id)
         put("timestamp", entry.timestamp)
@@ -212,6 +267,13 @@ object SaveStateManager {
         put("carrierFingerprint", item.carrierFingerprint ?: JSONObject.NULL)
         put("suspectedDeception", item.suspectedDeception)
         put("operatorDisposition", item.operatorDisposition.name)
+        put("authenticationStatus", item.authenticationStatus.name)
+        put("investigationActions", JSONArray().apply {
+            item.investigationActions.sortedBy { it.name }.forEach { put(it.name) }
+        })
+        put("investigationNotes", JSONArray().apply {
+            item.investigationNotes.forEach { put(it) }
+        })
 
         val claimsObject = JSONObject()
         item.claims.forEach { (key, value) -> claimsObject.put(key, value) }
@@ -249,6 +311,11 @@ object SaveStateManager {
         put(item.suspectedDeception)
         put(item.operatorDisposition.name)
         put(encodeClaimProvenance(item.claimProvenance))
+        put(JSONArray().apply {
+            item.investigationActions.sortedBy { it.name }.forEach { put(it.name) }
+        })
+        put(JSONArray().apply { item.investigationNotes.forEach { put(it) } })
+        put(item.authenticationStatus.name)
     }
 
     private fun decodeArchivedEvidence(row: JSONArray): InterceptEvidence =
@@ -266,6 +333,12 @@ object SaveStateManager {
             put("suspectedDeception", row.getBoolean(10))
             put("operatorDisposition", row.getString(11))
             put("claimProvenance", row.optJSONObject(12) ?: JSONObject())
+            put("investigationActions", row.optJSONArray(13) ?: JSONArray())
+            put("investigationNotes", row.optJSONArray(14) ?: JSONArray())
+            put(
+                "authenticationStatus",
+                row.optString(15, AuthenticationStatus.NOT_REQUESTED.name)
+            )
         })
 
     private fun decodeEvidence(json: JSONObject): InterceptEvidence {
@@ -299,6 +372,28 @@ object SaveStateManager {
                 missing += array.optString(i)
             }
         }
+        val investigationActions = mutableSetOf<InvestigationActionType>()
+        json.optJSONArray("investigationActions")?.let { array ->
+            for (i in 0 until array.length()) {
+                runCatching {
+                    InvestigationActionType.valueOf(array.optString(i))
+                }.getOrNull()?.let(investigationActions::add)
+            }
+        }
+        val investigationNotes = mutableListOf<String>()
+        json.optJSONArray("investigationNotes")?.let { array ->
+            for (i in 0 until array.length()) {
+                array.optString(i).takeIf { it.isNotBlank() }?.let(investigationNotes::add)
+            }
+        }
+        val authenticationStatus = runCatching {
+            AuthenticationStatus.valueOf(
+                json.optString(
+                    "authenticationStatus",
+                    AuthenticationStatus.NOT_REQUESTED.name
+                )
+            )
+        }.getOrDefault(AuthenticationStatus.NOT_REQUESTED)
         val reliability = runCatching {
             EvidenceReliability.valueOf(
                 json.optString("reliability", EvidenceReliability.UNVERIFIED.name)
@@ -325,7 +420,10 @@ object SaveStateManager {
                     json.optString("operatorDisposition", EvidenceDisposition.UNREVIEWED.name)
                 )
             }.getOrDefault(EvidenceDisposition.UNREVIEWED),
-            claimProvenance = observations
+            claimProvenance = observations,
+            investigationActions = investigationActions,
+            investigationNotes = investigationNotes,
+            authenticationStatus = authenticationStatus
         )
     }
 
@@ -369,6 +467,10 @@ object SaveStateManager {
             val breachesPrevented = json.optInt("breachesPrevented", 0)
             val deceptionsRejected = json.optInt("deceptionsRejected", 0)
             val deceptionsAccepted = json.optInt("deceptionsAccepted", 0)
+            val analysisCycles = json.optInt("analysisCycles", 3)
+                .coerceIn(0, InvestigationActions.MAX_ANALYSIS_CYCLES)
+            val investigationsPerformed = json.optInt("investigationsPerformed", 0)
+                .coerceAtLeast(0)
             val endingSummary = json.optString("endingSummary", "").takeIf { it.isNotBlank() }
 
             // Hotspots
@@ -482,6 +584,11 @@ object SaveStateManager {
                 }
             }
             val retainedEvidence = EvidenceCorrelation.retain(archivedEvidence + evidence)
+            val adversaryStrategy = decodeAdversaryStrategy(
+                json.optJSONObject("adversaryStrategy"),
+                seed,
+                locations
+            )
 
             val gameState = GameState(
                 phase = phase,
@@ -505,6 +612,9 @@ object SaveStateManager {
                 breachesPrevented = breachesPrevented,
                 deceptionsRejected = deceptionsRejected,
                 deceptionsAccepted = deceptionsAccepted,
+                analysisCycles = analysisCycles,
+                investigationsPerformed = investigationsPerformed,
+                adversaryStrategy = adversaryStrategy,
                 endingSummary = endingSummary,
                 isMapViewActive = false,
                 activeRouterGame = null,
