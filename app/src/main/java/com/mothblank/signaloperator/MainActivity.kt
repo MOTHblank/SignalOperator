@@ -382,12 +382,18 @@ class MainActivity : ComponentActivity() {
                             logs = logs,
                             importantLogs = importantLogs,
                             evidence = evidence,
+                            analysisCycles = gameState.analysisCycles,
+                            adversaryAlert = gameState.adversaryStrategy.alertLevel,
+                            investigationEnabled = gameState.phase != GamePhase.APTITUDE_TEST,
                             color = currentColor,
                             onLogClick = { viewModel.selectLogEntry(it) },
                             onEvidenceDisposition = { id, disposition ->
                                 viewModel.setEvidenceDisposition(id, disposition)
                             },
-                            modifier = Modifier.height(210.dp).fillMaxWidth().padding(top = 8.dp, bottom = 12.dp)
+                            onInvestigate = { id, action ->
+                                viewModel.investigateEvidence(id, action)
+                            },
+                            modifier = Modifier.height(240.dp).fillMaxWidth().padding(top = 8.dp, bottom = 12.dp)
                         )
                     }
                 }
